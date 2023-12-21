@@ -1,5 +1,7 @@
-import axios, { AxiosHeaders, AxiosResponse } from 'axios'
+import { ok } from 'assert'
+import { default as axios } from 'axios'
 import { JSDOM } from 'jsdom'
+import * as fs from 'fs' 
 
 class PathError extends Error {
     constructor(path: string) {
@@ -58,6 +60,25 @@ export class ResolutionDetailsPage {
     ) {
     }
 }
+
+export class DraftResolutionPage {
+
+    constructor(public readonly symbol: string,
+        public readonly title: string,
+        public readonly access: string,
+        public readonly resolutionOrDecision,
+        public readonly authors: string[],
+        public readonly agendaInformation: string,
+        public readonly date: Date,
+        public readonly description: string,
+        public readonly notes: string,
+        public readonly collections: string[],
+        public readonly subjects: string[],
+                
+    ) {}
+
+}
+
 
 export class HtmlParser {
 
@@ -141,6 +162,7 @@ class ParserValueList extends ParserValue {
                 let parserValue = this.subQueries[key]
                 item[key] = parserValue.valueOf(parser, el)
             }
+            results.push(item)
         })
         return results
     }
@@ -159,19 +181,19 @@ export abstract class UrlReader {
 
 export class AxiosUrlReader extends UrlReader {
     
-    public response: AxiosResponse
+    public response: axios.AxiosResponse
     public lastUrl: string
 
-    public getHeaders(): AxiosHeaders  {
-        let headers = new AxiosHeaders()
-        headers.set('Accept', 'text/html')
-        headers.set('Accept-Encoding', 'gzip, deflate, br')
-        headers.set('Accept-Language', 'en-US,en;q=0.5')
-        headers.set('User-Agent', 'Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/113.0')
-        return headers
+    public getHeaders(): Record<string, string>  {
+        let values = {'Accept': 'text/html',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/113.0'
+        }
+        return values
     }
 
-    async readUrl(url: string) {
+    async readUrl(url: string): Promise<boolean> {
         this.lastUrl = url
         this.response = await axios.get(url, {headers: this.getHeaders()})
         return this.isSuccess()
@@ -184,7 +206,49 @@ export class AxiosUrlReader extends UrlReader {
     data(): any {
         return this.response.data
     }
+}
 
+export class CachedAxiosUrlReader extends AxiosUrlReader {
+
+    private __cachedData: string
+    private __encoding: BufferEncoding = 'utf-8'
+
+    private __cachePath(url: string) {
+        const name = url.replace(/^(http)(s*):\/\/|[^a-zA-Z0-9]/g, '')
+        const cache_path = process.env.CACHE_PATH ? process.env.CACHE_PATH : 'storage/cache' 
+        return [cache_path, name].join('/')
+    }
+
+    private __isCached(url: string): boolean {
+        return fs.existsSync(this.__cachePath(url))
+    }
+
+    private __fromCache(url: string): string {
+        const data = fs.readFileSync(this.__cachePath(url), this.__encoding)
+        return data
+    }
+
+    private __writeCache(url: string, data: string) {
+        const path = this.__cachePath(url)
+        fs.writeFileSync(path, data)
+    }
+
+    public data(): any {
+        return this.__cachedData != undefined ? this.__cachedData : super.data()
+    }
+
+    async readUrl(url: string, useCache=true): Promise<boolean> {
+        if(useCache && this.__isCached(url)) {
+            this.__cachedData = this.__fromCache(url)
+            return new Promise<boolean>((resolve) => resolve(true))
+        } else {
+            const result = await super.readUrl(url)
+            if(result) {
+                this.__writeCache(url, this.data())
+            }
+            return result
+        }
+    }
 }
 
 abstract class PageReader<T> {
@@ -196,14 +260,13 @@ abstract class PageReader<T> {
     }
 
     protected async _read() {
-
-        this.reader.readUrl(this.url)
+        await this.reader.readUrl(this.url)
         this._parser = new HtmlParser(this.reader.data())
     }
 
     public async fetch(): Promise<T> {
         await this._read()
-        let result = this._parse()
+        let result = await this._parse()
         return result
     }
 
@@ -223,24 +286,14 @@ abstract class PageReader<T> {
 
 export class ResolutionListPageReader extends PageReader<ResolutionListPage> {
     
-    
     static readonly pageSize: number = 50
     static readonly rootUrl = 'https://digitallibrary.un.org'
     static readonly indexUrl = 'https://digitallibrary.un.org/search?cc=Voting+Data&ln=en&c=Voting+Data'
-    protected _queries = {
-        'numberOfRecords': new ParserValueText('td.searchresultsboxheader>span>strong'),
-        'references': 
-                new ParserValueList('div.result-row',{
-                    'title': new ParserValueText('.result-title>a'),
-                    'brief-options': new ParserValueText('.brief-options'),
-                    'url': new ParserValueAttribute('a.moreinfo', 'href')
-                })
-        }
-    
+    protected _queries = {}
 
     public static getUrl(page: number) {
         if (page == 1)
-            return this.rootUrl
+            return this.indexUrl
         let start = (page -1) * this.pageSize
         return this.indexUrl + `&rg=${start}&jrec=${start+this.pageSize+1}`
     }
@@ -259,12 +312,15 @@ export class ResolutionListPageReader extends PageReader<ResolutionListPage> {
         values['references'] = []
         let titles = this._parser.search('div.result-title>a')
         let briefOptions = this._parser.search('div.brief-options')
-        let links = this._parser.search('a.moreinfo')
+        let links = Array.from(this._parser.search('a.moreinfo'))
+            .map((val: Element) => val.attributes['href'].value)
+            .filter((value: string) => value.startsWith('/record'))
+        ok(links.length == titles.length)
         titles.forEach((el, i: number) => {
             values['references'].push({
                 'title': el.textContent,
                 'brief-options': briefOptions[i].textContent,
-                'url': ResolutionListPageReader.rootUrl + links[i].attributes['href'].value})
+                'url': ResolutionListPageReader.rootUrl + links[i]})
         })
         return values
     }
@@ -286,6 +342,61 @@ export class ResolutionListPageReader extends PageReader<ResolutionListPage> {
     }
 }
 
+export class DraftResolutionPageReader extends PageReader<DraftResolutionPage> {
+    
+    protected _readQueries(): Record<string, any> {
+        let results = {}
+        let titles = this._parser.search('span.title')
+        let values = this._parser.search('span.value')
+        let htmlFields = ['Authors', 'Collections']
+        titles.forEach((el: Element, index) => {
+            let name = el.textContent.trim()
+            let value = htmlFields.includes(name) ? values[index].innerHTML.trim() : values[index].textContent.trim()
+            results[name] = value
+        })
+        return results
+    }
+
+    private __getAuthors(value: string): string[] {
+        return Array.from(value.matchAll(/<a[^>]*href=\"([^\"]+)\"[^>]*>([\w ]+)<\/a>/g))
+            .map((match: RegExpExecArray) => match[2])
+    }
+
+    private __getDate(value: string): Date {
+        const dateStr = value.substring(value.indexOf(',') + 1)
+        return new Date(Date.parse(dateStr))
+    }
+
+    private __getSubjects(): string[] {
+        const container = this._parser.find('ul.rs-group-list')
+        return Array.from(container.querySelectorAll('a.rs-link'))
+            .map((el: Element) => el.textContent)
+    }
+
+    protected _parse(): DraftResolutionPage {
+        let values = this._readQueries()
+        let collections = []
+        values['Collections'].split(/<[ ]*br[ \/]*>/).forEach((txt: string) => {
+            collections.push(txt.replace(/<\/?[^>]+(>|$)/g, ''))
+        })
+        let resolution = new DraftResolutionPage(
+            values['Symbol'],
+            values['Title'],
+            values['Access'],
+            values['Resolution / Decision'],
+            this.__getAuthors(values['Authors']),
+            values['Agenda information '],
+            this.__getDate(values['Date']),
+            values['Description'],
+            values['Notes'],
+            collections,
+            this.__getSubjects()
+        )
+        return resolution
+    }
+    
+}
+
 export class ResolutionDetailsPageReader extends PageReader<ResolutionDetailsPage> {
     
 
@@ -295,7 +406,10 @@ export class ResolutionDetailsPageReader extends PageReader<ResolutionDetailsPag
 
     private __getVotes(value: string): Map<string, string> {
         let votes = new Map<string, string>()
-        let matches = value.matchAll(/ *([YNA] )*([^<>]{3,})/g)
+        if (value == undefined) {
+            return votes
+        }
+        let matches = value.matchAll(/ *([YNA] )*([^<>]{4,})/g)
         let done = false
         while(!done) {
             let match = matches.next()
@@ -354,16 +468,19 @@ function report(msg: string) {
 
 export async function read_pages(start: number, end: number): Promise<Array<ResolutionDetailsPage>> {
     let results: Array<ResolutionDetailsPage> = []
+    let cachedReader = new CachedAxiosUrlReader()
     let reader = new AxiosUrlReader()
     for(let page = start; page < end + 1; page++) {
         report(`Reading page ${page} ...`)
         let listPage = await new ResolutionListPageReader(page, reader).fetch()
         report(`Fetching ${listPage.resolutions.length} items...`)
-        listPage.resolutions.forEach(async (ref, i) => {
-            let detailsPage = await new ResolutionDetailsPageReader(ref, reader).fetch()
+        let i = 1
+        for(const ref of listPage.resolutions) {
+            report(`reading item: ${i}: ${ref.url}...`)
+            let detailsPage = await new ResolutionDetailsPageReader(ref, cachedReader).fetch()
             results.push(detailsPage)
-            report(`Item: ${i}.`)
-        })
+            i++
+        }
     }
     return results
 }

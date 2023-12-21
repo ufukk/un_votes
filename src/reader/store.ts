@@ -1,30 +1,28 @@
-import { Country, Resolution, Agenda, Vote, ResolutionVote, ResolutionType, ResolutionStatus, CountryRepository, AgendaRepository } from "./models"
-import { ResolutionDetailsPage } from './crawler'
+import { Subject, Country, Resolution, Agenda, Vote, ResolutionVote, ResolutionType, ResolutionStatus, CountryRepository, AgendaRepository, DraftResolution } from "./models"
+import { DraftResolutionPage, ResolutionDetailsPage } from './crawler'
+import { DataSource } from "typeorm"
 
 abstract class Transformer<K, T> {
 
-    item: K
-
-    constructor(item: K) {
-        this.item = item
+    constructor(protected readonly dataSource: DataSource) {
     }
 
-    abstract transform(): T
+    abstract transform(item: K): Promise<T>
 }
 
 
 export class CountryNameTransformer extends Transformer<string, Country> {
     
-    findCountryByName(name: string): Country | null {
-        return CountryRepository.fetchByUnName(this.item)
+    async findCountryByName(name: string): Promise<Country | null> {
+        return await CountryRepository.createInstance(this.dataSource).fetchByUnName(name)
     }
 
-    transform(): Country {
-        let country = this.findCountryByName(this.item)
+    async transform(item: string): Promise<Country> {
+        let country = await this.findCountryByName(item)
         if(country == null) {
             country = new Country()
-            country.name = this.item
-            country.un_name = this.item
+            country.name = item
+            country.un_name = item
         }
         return country
     }
@@ -33,16 +31,16 @@ export class CountryNameTransformer extends Transformer<string, Country> {
 
 export class AgendaNameTransformer extends Transformer<string, Agenda> {
     
-    findAgendaByName(name: string): Agenda | null {
-        return AgendaRepository.fetchByUnName(this.item)
+    async findAgendaByName(name: string): Promise<Agenda | null> {
+        return await AgendaRepository.createInstance(this.dataSource).fetchByUnName(name)
     }
 
-    transform(): Agenda {
-        let agenda = this.findAgendaByName(this.item)
+    async transform(item: string): Promise<Agenda> {
+        let agenda = await this.findAgendaByName(item)
         if(agenda == null) {
             agenda = new Agenda()
-            agenda.name = this.item
-            agenda.un_name = this.item
+            agenda.name = item
+            agenda.un_name = item
         }
         return agenda
     }
@@ -62,48 +60,50 @@ export class ResolutionDetailsPageTransformer extends Transformer<ResolutionDeta
         'No Machine Generated Vote': ResolutionStatus.NoMachineGeneratedVote
     }
 
-    private __votes() {
+    private async __votes(item: ResolutionDetailsPage) {
         let votes: ResolutionVote[] = []
-        this.item.votes.forEach((value, key) => {
-            votes.push(new ResolutionVoteTransformer([key, value]).transform())
-        })
+        for(const [key, value] of item.votes.entries()) {
+            let tr = new ResolutionVoteTransformer(this.dataSource)
+            votes.push(await tr.transform([key, value]))
+        }
         return votes
     }
 
-    private __agendas() {
+    private async __agendas(item: ResolutionDetailsPage) {
         let agendas: Agenda[] = []
-        this.item.agendas.forEach((name) => {
-            agendas.push(new AgendaNameTransformer(name).transform())
+        item.agendas.forEach(async (name) => {
+            let agendaTransformer = new AgendaNameTransformer(this.dataSource)
+            agendas.push(await agendaTransformer.transform(name))
         })
         return agendas
     }
 
-    transform(): Resolution {
+    async transform(item: ResolutionDetailsPage): Promise<Resolution> {
         let resolution = new Resolution()
-        resolution.resolutionType = this.item.resolutionCode.charAt(0) == 'A' ? ResolutionType.GeneralCouncil : ResolutionType.SecurityCouncil
-        resolution.resolutionStatus = this.item.note.startsWith('RECORDED') ? ResolutionStatus.Recorded : ResolutionStatus.AdoptedWithoutVote
-        resolution.draftResolutionCode = this.item.draftResolutionCode
-        resolution.meetingRecordCode = this.item.meetingRecordCode
-        resolution.note = this.item.note
-        resolution.resolutionCode = this.item.resolutionCode
-        resolution.title = this.item.title
-        resolution.voteDate = this.item.voteDate
-        resolution.voteSummary = this.item.voteSummary
-        resolution.agendas = this.__agendas()
-        resolution.votes = this.__votes()
+        resolution.resolutionType = item.resolutionCode.charAt(0) == 'A' ? ResolutionType.GeneralCouncil : ResolutionType.SecurityCouncil
+        resolution.resolutionStatus = item.note.startsWith('RECORDED') ? ResolutionStatus.Recorded : ResolutionStatus.AdoptedWithoutVote
+        resolution.draftResolutionCode = item.draftResolutionCode
+        resolution.meetingRecordCode = item.meetingRecordCode
+        resolution.note = item.note
+        resolution.resolutionCode = item.resolutionCode
+        resolution.title = item.title
+        resolution.voteDate = item.voteDate
+        resolution.voteSummary = item.voteSummary
+        resolution.agendas = await this.__agendas(item)
+        resolution.votes = await this.__votes(item)
         return resolution
     }
 
 }
 
-export class ResolutionVoteTransformer extends Transformer<string[], ResolutionVote> {
+export class ResolutionVoteTransformer extends Transformer<[string, string], ResolutionVote> {
     
     static readonly LABELS = {'Y': Vote.Yes, 'N': Vote.No, 'A': Vote.Abstained}
 
-    transform(): ResolutionVote {
-        let countryName = this.item[0]
-        let voteLabel = this.item[1]
-        let country = new CountryNameTransformer(countryName).transform()
+    async transform(key_value: [string, string]): Promise<ResolutionVote> {
+        let countryName = key_value[0]
+        let voteLabel = key_value[1]
+        let country = await new CountryNameTransformer(this.dataSource).transform(countryName)
         let vote = ResolutionVoteTransformer.LABELS[voteLabel] as Vote
         let resolution = new ResolutionVote()
         resolution.country = country
@@ -113,3 +113,18 @@ export class ResolutionVoteTransformer extends Transformer<string[], ResolutionV
 
 }
 
+export class SubjectTransformer extends Transformer<string, Subject> {
+    
+    transform(item: string): Promise<Subject> {
+        throw new Error("Method not implemented.")
+    }
+    
+}
+
+export class DraftResolutionTransformer extends Transformer<DraftResolutionPage, DraftResolution> {
+    
+    transform(item: DraftResolutionPage): Promise<DraftResolution> {
+        throw new Error("Method not implemented.")
+    }
+    
+}

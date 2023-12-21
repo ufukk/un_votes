@@ -15,7 +15,8 @@ export enum ResolutionStatus {
 export enum Vote {
     Abstained = 1,
     Yes = 2,
-    No = 3
+    No = 3,
+    Missing = 4
 }
 
 @Entity()
@@ -30,10 +31,10 @@ export class Country {
     @Column({unique: true})
     un_name: string
     
-    @Column({unique: true})
+    @Column({unique: true, nullable: true})
     alpha2: string
     
-    @Column({unique: true})
+    @Column({unique: true, nullable: true})
     fipscode: number
 
 }
@@ -49,27 +50,52 @@ export class Agenda {
 
     @Column({unique: true})
     un_name: string
-
-    @ManyToMany(() => Resolution)
-    resolutions: Resolution[]
 }
 
 @Entity()
-@Unique('country_resolution', ['resolutionId', 'country_id'])
-export class ResolutionVote {
+export class Subject {
 
     @PrimaryGeneratedColumn()
-    vote_id: number
+    subjectId: number
 
-    @ManyToOne(() => Resolution)
-    resolution: Resolution
-
-    @ManyToOne(() => Country)
-    country: Country
-
-    @Column()
-    vote: Vote
+    @Column({unique: true})
+    subjectName: string
 }
+
+@Entity()
+export class DraftResolution {
+    
+    @PrimaryGeneratedColumn()
+    draftResolutionId: number
+
+    symbol: string
+
+    title: string
+
+    access: string
+
+    resolutionOrDecision: string
+
+    @ManyToMany(() => Country, {eager: true})
+    @JoinTable()
+    authors: Country[]
+
+    agendaInformation: string
+
+    date: Date
+
+    description: string
+
+    notes: string
+
+    @ManyToMany(() => Subject, {eager: true})
+    @JoinTable()
+    subjects: Subject[]
+
+    @OneToMany(() => Resolution, (res) => res.draftResolution)
+    resolutions: Resolution[]
+}
+
 
 @Entity()
 export class Resolution {
@@ -83,11 +109,11 @@ export class Resolution {
     @Column()
     resolutionStatus: ResolutionStatus
     
+    @ManyToOne(() => DraftResolution, (draft) => draft.resolutions)
+    draftResolution: DraftResolution
+
     @Column()
     title: string
-    
-    @Column()
-    agenda: string
     
     @Column({unique: true})
     resolutionCode: string
@@ -107,72 +133,109 @@ export class Resolution {
     @Column()
     voteDate: Date
     
-    @OneToMany(() => ResolutionVote, (vote) => vote.resolution)
+    @OneToMany(() => ResolutionVote, (vote) => vote.resolution, {eager: true, cascade: true})
     votes: ResolutionVote[]
 
-    @ManyToMany(() => Agenda)
+    @ManyToMany(() => Agenda, {eager: true})
     @JoinTable()
-    agendas: Array<Agenda>
+    agendas: Agenda[]
 }
 
+
+@Entity()
+@Unique(['resolution', 'country'])
+export class ResolutionVote {
+
+    @PrimaryGeneratedColumn()
+    vote_id: number
+
+    @ManyToOne(() => Resolution, (resolution) => resolution.votes)
+    resolution: Resolution
+
+    @ManyToOne((type) => Country)
+    country: Country
+
+    @Column()
+    vote: Vote
+}
 
 export const dataSource = new DataSource({
     type: 'sqlite',
     database: 'storage/votes.db'
 })
 
+class BaseRepository<T> extends Repository<T> {
 
-export const ResolutionRepository = dataSource.getRepository(Resolution).extend({
-    resolutionsByYear(year): Resolution[] {
-        let startDate = new Date(year, 1, 1)
-        let endDate = new Date(year + 1, 1, 1)
-        let query = this.createQueryBuilder('resolution')
-        .where('voteDate >= :startDate AND voteDate < :endDate', {startDate, endDate})
-        .orderBy('voteDate', 'ASC')
-        return query.getMany()
-    },
+    
 
-    resolutionsByAgenda(agenda: number): Resolution[] {
-        return this.createQueryBuilder('resolution')
-        .leftJoinAndSelect('resolution.agendas', 'agenda')
-        .where('agenda_id == :agenda_id', { agenda })
-        .orderBy('voteDate', 'ASC')
-        .getMany()
-    },
+}
 
-    doesResolutionCodeExist(code: string): boolean {
-        return this.createQueryBuilder('resolution')
-        .where('resolutionCode == :code', { code })
-        .count('resolutionId') > 0
+export class ResolutionRepository extends BaseRepository<Resolution> {
+    
+    static createInstance(dataSource: DataSource): ResolutionRepository {
+        return new ResolutionRepository(Resolution, dataSource.createEntityManager())
     }
-})
 
-
-export const ResolutionVoteRepository = dataSource.getRepository(ResolutionVote).extend({
-    votesForResolution(resolutionId: number): Map<string, ResolutionVote> {
-        let votes: ResolutionVote[] = this.createQueryBuilder('resolution_vote')
-        .where('resolution_id = :resolution_id', {resolutionId})
-        .getMany()
+    async votesForResolution(resolutionId: number): Promise<Map<string, ResolutionVote>> {
+        let votes: ResolutionVote[] = (await this.findOneBy({resolutionId: resolutionId})).votes
         let vote_map = new Map<string, ResolutionVote>()
         for(let vote of votes) {
             vote_map[vote.country.name] = vote.vote
         }
         return vote_map
     }
-})
 
-export const CountryRepository = dataSource.getRepository(Country).extend({
-    fetchByUnName(name: string): Country | null {
-        return this.createQueryBuilder('country')
-        .where('un_name = :name', {name})
-        .getOne()
+    async resolutionsByYear(year): Promise<Resolution[]> {
+        let startDate = new Date(year, 1, 1)
+        let endDate = new Date(year + 1, 1, 1)
+        let query = this.createQueryBuilder('resolution')
+        .where('voteDate >= :startDate AND voteDate < :endDate', {startDate, endDate})
+        .orderBy('voteDate', 'ASC')
+        return query.getMany()
     }
-})
 
-export const AgendaRepository = dataSource.getRepository(Agenda).extend({
-    fetchByUnName(name: string): Agenda | null {
-        return this.createQueryBuilder('agenda')
-        .where('un_name = :name', {name})
-        .getOne()
+    async resolutionsByAgenda(agenda: number): Promise<Resolution[]> {
+        return this.createQueryBuilder('resolution')
+        .leftJoinAndSelect('resolution.agendas', 'agenda')
+        .where('agenda_id == :agenda_id', { agenda })
+        .orderBy('voteDate', 'ASC')
+        .getMany()
     }
-})
+
+    async doesResolutionCodeExist(code: string): Promise<boolean> {
+        return (await this.countBy({resolutionCode: code})) > 0
+    }
+}
+
+
+export class ResolutionVoteRepository extends BaseRepository<ResolutionVote> {
+
+    static createInstance(dataSource: DataSource): ResolutionVoteRepository {
+        return new ResolutionVoteRepository(ResolutionVote, dataSource.createEntityManager())
+    }
+
+}
+
+export class CountryRepository extends BaseRepository<Country> {
+
+    static createInstance(dataSource: DataSource): CountryRepository {
+        return new CountryRepository(Country, dataSource.createEntityManager())
+    }
+
+    async fetchByUnName(name: string): Promise<Country> {
+        return await this.findOneBy({un_name: name})
+    }
+
+}
+
+export class AgendaRepository extends BaseRepository<Agenda> {
+
+    static createInstance(dataSource: DataSource): AgendaRepository {
+        return new AgendaRepository(Agenda, dataSource.createEntityManager())
+    }
+
+    async fetchByUnName(name: string): Promise<Agenda> {
+        return await this.findOneBy({un_name: name})
+    }
+
+}

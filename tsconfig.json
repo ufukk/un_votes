@@ -1,6 +1,11 @@
 {
     "compilerOptions": {
         "emitDecoratorMetadata": true,
-        "experimentalDecorators": true
+        "experimentalDecorators": true,
+        "target": "ES2015",
+        "moduleResolution": "NodeNext",
+        "module": "NodeNext",
+        "rootDirs": ["./src"],
+        "outDir": "./dist"
     }
 }

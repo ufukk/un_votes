@@ -2,9 +2,12 @@
   "name": "un_votes",
   "version": "0.0.1",
   "description": "\"U.N. Voting Database & Browser & Analysis Tool\"",
-  "main": "index.js",
+  "main": "./dist/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "build": "tsc",
+    "tsc:w": "tsc -w --outDir dist",
+    "start": "npm run build && node -e \"import('./dist/src/runner.js').then(m => m.main());\""
   },
   "repository": {
     "type": "git",
@@ -26,6 +29,16 @@
   },
   "homepage": "https://github.com/ufukk/un_votes#readme",
   "dependencies": {
+    "@types/jsdom": "^21.1.6",
+    "axios": "^1.6.2",
+    "jsdom": "^23.0.1",
+    "knex": "^3.1.0",
+    "reflect-metadata": "^0.1.14",
+    "sqlite3": "^5.1.6",
+    "typeorm": "^0.3.17",
     "typescript": "^5.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.4"
   }
 }

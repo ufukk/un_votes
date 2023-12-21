@@ -1,3 +1,4 @@
+import { DataSource } from 'typeorm'
 import { ResolutionDetailsPage } from './crawler'
 import { Country, Resolution, Agenda, CountryRepository, AgendaRepository, ResolutionRepository, dataSource } from './models'
 
@@ -18,7 +19,7 @@ abstract class ImportTask<T> {
     readonly taskResult: TaskResult
     readonly items: T[]
 
-    constructor(items: T[]) {
+    constructor(items: T[], public readonly dataSource: DataSource) {
         this.items = items
         this.taskResult = new TaskResult()
     }
@@ -27,7 +28,7 @@ abstract class ImportTask<T> {
 
 }
 
-class ResolutionImportTask extends ImportTask<Resolution> {
+export class ResolutionImportTask extends ImportTask<Resolution> {
     
     async importNewCountries() {
         let newCountries: Record<string, Country> = {}
@@ -38,8 +39,15 @@ class ResolutionImportTask extends ImportTask<Resolution> {
                 }
             })
         })
+        let repo = CountryRepository.createInstance(this.dataSource)
         for(let name in newCountries) {
-            await CountryRepository.insert(newCountries[name])
+            await repo.insert(newCountries[name])
+        }
+        for (const resolution of this.items)  {
+            for (const vote of resolution.votes) {
+                vote.country = await repo.findOneBy({un_name: vote.country.un_name})
+                vote.resolution = resolution
+            }
         }
     }
 
@@ -52,20 +60,32 @@ class ResolutionImportTask extends ImportTask<Resolution> {
                 }
             })
         })
+        let repo = AgendaRepository.createInstance(this.dataSource)
         for(let name in newAgendas) {
-            await AgendaRepository.insert(newAgendas[name])
+            await repo.insert(newAgendas[name])
+        }
+        for (const resolution of this.items)  {
+            let names: string[] = []
+            for (const agenda of resolution.agendas) {
+                names.push(agenda.un_name)
+            }
+            resolution.agendas = []
+            for(const name of names) {
+                resolution.agendas.push(await repo.findOneBy({un_name: name}))
+            }
         }
     }
 
     async importAll() {
         await this.importNewCountries()
         await this.importNewAgendas()
+        let repo = ResolutionRepository.createInstance(this.dataSource)
         for(let item of this.items) {
-            if(ResolutionRepository.doesResolutionCodeExist(item.resolutionCode)) {
+            if((await repo.doesResolutionCodeExist(item.resolutionCode))) {
                 this.taskResult.skipped++
                 continue
             }
-            await ResolutionRepository.insert(item)
+            await repo.save(item)
             this.taskResult.successes++
         }
     }
