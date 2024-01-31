@@ -26,6 +26,11 @@ export class ResolutionReference {
     }
 }
 
+export interface Cascading {
+
+    
+}
+
 class ResolutionListPage {
 
     constructor(
@@ -44,20 +49,53 @@ class ResolutionCursor {
     }
 }
 
+export const YES_VALUE = 'Y'
+
+export const NO_VALUE = 'N'
+
+export const ABSTENTION_VALUE = 'A'
+
+export const NONVOTING_VALUE = '-'
+
 export class ResolutionDetailsPage {
 
     constructor(public readonly title: string,
         public readonly agendas: string[],
         public readonly resolutionCode: string,
+        public readonly parentResolutionUrl: string,
         public readonly meetingRecordCode: string,
         public readonly draftResolutionCode: string,
+        public readonly draftResolutionUrl: string,
         public readonly committeeReportCode: string,
         public readonly note: string,
         public readonly voteSummary: string,
         public readonly voteDate: Date,
+        public readonly detailsUrl: string,
         public readonly votes: Map<string, string>,
         public readonly collections: string[]
-    ) {
+    ) {  
+
+        
+      }
+
+    protected _votesByValue(value: string): string[] {
+        return Array.from(this.votes.keys()).filter((key) => this.votes.get(key) == value)
+    }
+
+    public yes_votes(): string[] {
+        return this._votesByValue(YES_VALUE)
+    }
+
+    public no_votes(): string[] {
+        return this._votesByValue(NO_VALUE)
+    }
+
+    public abstention_votes(): string[] {
+        return this._votesByValue(ABSTENTION_VALUE)
+    }
+
+    public nonvoting_votes(): string[] {
+        return this._votesByValue(NONVOTING_VALUE)
     }
 }
 
@@ -72,11 +110,11 @@ export class DraftResolutionPage {
         public readonly date: Date,
         public readonly description: string,
         public readonly notes: string,
+        public readonly detailsUrl: string,
         public readonly collections: string[],
         public readonly subjects: string[],
                 
     ) {}
-
 }
 
 
@@ -169,17 +207,19 @@ class ParserValueList extends ParserValue {
     
 }
 
-export abstract class UrlReader {
+export interface UrlReader {
 
-    abstract readUrl(url: string): Promise<boolean>
+    readUrl(url: string): Promise<boolean>
 
-    abstract isSuccess(): boolean
+    isSuccess(): boolean
 
-    abstract data(): any
+    data(): any
+
+    responseData(): any
 
 }
 
-export class AxiosUrlReader extends UrlReader {
+export class AxiosUrlReader implements UrlReader {
     
     public response: axios.AxiosResponse
     public lastUrl: string
@@ -206,6 +246,10 @@ export class AxiosUrlReader extends UrlReader {
     data(): any {
         return this.response.data
     }
+
+    responseData(): any {
+        return this.response
+    }
 }
 
 export class CachedAxiosUrlReader extends AxiosUrlReader {
@@ -215,7 +259,7 @@ export class CachedAxiosUrlReader extends AxiosUrlReader {
 
     private __cachePath(url: string) {
         const name = url.replace(/^(http)(s*):\/\/|[^a-zA-Z0-9]/g, '')
-        const cache_path = process.env.CACHE_PATH ? process.env.CACHE_PATH : 'storage/cache' 
+        const cache_path = process.env.CACHE_PATH ? process.env.CACHE_PATH : 'storage/cache'
         return [cache_path, name].join('/')
     }
 
@@ -260,7 +304,10 @@ abstract class PageReader<T> {
     }
 
     protected async _read() {
-        await this.reader.readUrl(this.url)
+        const isSuccessful = await this.reader.readUrl(this.url)
+        if(!isSuccessful) {
+            throw Error(`Url: ${this.url} failed: ${this.reader.responseData().status}`)
+        }
         this._parser = new HtmlParser(this.reader.data())
     }
 
@@ -284,6 +331,35 @@ abstract class PageReader<T> {
     protected abstract _parse(): T
 }
 
+class GatewayPage {
+
+
+    public constructor(public readonly years: number[]) { 
+    }
+
+}
+
+export class GatewayReader extends PageReader<GatewayPage> {
+
+    static readonly gatewayUrl = 'https://digitallibrary.un.org/search?cc=Voting+Data&ln=en&c=Voting+Data'
+
+    constructor(public readonly reader: UrlReader) {
+        super(GatewayReader.gatewayUrl, reader)
+    }
+
+    protected findYears(): number[] {
+        return Array.from(new Set<number>(Array.from(this._parser.search('li>div>label>span'))
+        .filter((node) => node.textContent.trim().match(/^[1|2]\d{3}$/gm))
+        .map((node) => Number.parseInt(node.textContent.trim()))))
+    }
+
+    protected _parse(): GatewayPage {
+        const years = this.findYears()
+        return new GatewayPage(years)
+    }
+
+}
+
 export class ResolutionListPageReader extends PageReader<ResolutionListPage> {
     
     static readonly pageSize: number = 50
@@ -291,18 +367,20 @@ export class ResolutionListPageReader extends PageReader<ResolutionListPage> {
     static readonly indexUrl = 'https://digitallibrary.un.org/search?cc=Voting+Data&ln=en&c=Voting+Data'
     protected _queries = {}
 
-    public static getUrl(page: number) {
-        if (page == 1)
-            return this.indexUrl
-        let start = (page -1) * this.pageSize
-        return this.indexUrl + `&rg=${start}&jrec=${start+this.pageSize+1}`
+    public static getUrl(page: number, year: number) {
+        if (page == 1) {
+            return this.indexUrl + `&fct__3=${year}`
+        }
+        let end = ((page - 1) * this.pageSize) + 1
+        return this.indexUrl + `&rg=${this.pageSize}&jrec=${end}&fct__3=${year}`
     }
 
-    constructor(public readonly page: number, reader: UrlReader) {
-        super(ResolutionListPageReader.getUrl(page), reader)
+    constructor(public readonly page: number, public readonly year: number, reader: UrlReader) {
+        super(ResolutionListPageReader.getUrl(page, year), reader)
+        report(`URL: ${this.url}`)
     }
 
-    public numberToPage(total: number): number {
+    public static numberToPage(total: number): number {
         return Math.ceil(total / ResolutionListPageReader.pageSize)
     }
 
@@ -357,9 +435,9 @@ export class DraftResolutionPageReader extends PageReader<DraftResolutionPage> {
         return results
     }
 
-    private __getAuthors(value: string): string[] {
-        return Array.from(value.matchAll(/<a[^>]*href=\"([^\"]+)\"[^>]*>([\w ]+)<\/a>/g))
-            .map((match: RegExpExecArray) => match[2])
+    private __getAuthors(authorStr: string): string[] {
+        return Array.from(new Set<string>(Array.from(authorStr.matchAll(/<a[^>]*href=\"([^\"]+)\"[^>]*>([\w ]+)<\/a>/g))
+        .map((match: RegExpExecArray) => match[2])))
     }
 
     private __getDate(value: string): Date {
@@ -369,8 +447,8 @@ export class DraftResolutionPageReader extends PageReader<DraftResolutionPage> {
 
     private __getSubjects(): string[] {
         const container = this._parser.find('ul.rs-group-list')
-        return Array.from(container.querySelectorAll('a.rs-link'))
-            .map((el: Element) => el.textContent)
+        return Array.from(new Set<string>(Array.from(container.querySelectorAll('a.rs-link'))
+        .map((el: Element) => el.textContent)))
     }
 
     protected _parse(): DraftResolutionPage {
@@ -379,16 +457,18 @@ export class DraftResolutionPageReader extends PageReader<DraftResolutionPage> {
         values['Collections'].split(/<[ ]*br[ \/]*>/).forEach((txt: string) => {
             collections.push(txt.replace(/<\/?[^>]+(>|$)/g, ''))
         })
+        
         let resolution = new DraftResolutionPage(
             values['Symbol'],
             values['Title'],
             values['Access'],
             values['Resolution / Decision'],
-            this.__getAuthors(values['Authors']),
+            values['Authors'] ? this.__getAuthors(values['Authors']) : [],
             values['Agenda information '],
             this.__getDate(values['Date']),
             values['Description'],
             values['Notes'],
+            this.url,
             collections,
             this.__getSubjects()
         )
@@ -418,7 +498,7 @@ export class ResolutionDetailsPageReader extends PageReader<ResolutionDetailsPag
             if(!m || done)
                 break
             let name = m[2]
-            let vote = m[1] ? m[1].trim() : 'M'
+            let vote = m[1] ? m[1].trim() : NONVOTING_VALUE
             votes.set(name, vote)
         }
         return votes
@@ -428,7 +508,7 @@ export class ResolutionDetailsPageReader extends PageReader<ResolutionDetailsPag
         let results = {}
         let titles = this._parser.search('span.title')
         let values = this._parser.search('span.value')
-        let htmlFields = ['Vote', 'Collections']
+        let htmlFields = ['Vote', 'Collections', 'Draft resolution', 'Resolution']
         titles.forEach((el: Element, index) => {
             let name = el.textContent.trim()
             let value = htmlFields.includes(name) ? values[index].innerHTML.trim() : values[index].textContent.trim()
@@ -437,24 +517,44 @@ export class ResolutionDetailsPageReader extends PageReader<ResolutionDetailsPag
         return results
     }
 
+    private __readDraftValues(value: string): [string, string] {
+        if(value == null) {
+            return [null, null]
+        }
+        const matches = value.match(/<a[^>]+href="([^"]+)">([^<]+)<\/a>/)
+        return matches ? [matches[2], matches[1]] : [value, null]
+    }
+
     protected _parse(): ResolutionDetailsPage {
-        let values = this._readQueries()
-        let voteDate = new Date(Date.parse(values['Vote date']))
-        let collections = []
+        const values: Record<string, string> = this._readQueries()
+        const voteDate = new Date(Date.parse(values['Vote date']))
+        const collections = []
+        const separator = '&gt;'
         values['Collections'].split(/<[ ]*br[ \/]*>/).forEach((txt: string) => {
-            collections.push(txt.replace(/<\/?[^>]+(>|$)/g, ''))
+            const parts = txt.replace(/<\/?[^>]+(>|$)/g, '').split(separator)
+            collections.push(parts[parts.length - 1].trim())
         })
-        let votes = this.__getVotes(values['Vote'])
-        let resolution = new ResolutionDetailsPage(
+        const votes = this.__getVotes(values['Vote'])
+        let [draftTextCode, draftTextUrl] = this.__readDraftValues(values['Draft resolution'])
+        const [resolutionCode, parentResolutionUrl] = this.__readDraftValues(values['Resolution'])
+        /* workaround for resolutions without a draft: use resolution instead. */
+        if(!draftTextCode && parentResolutionUrl) {
+            draftTextCode = resolutionCode
+            draftTextUrl = parentResolutionUrl
+        }
+        const resolution = new ResolutionDetailsPage(
             values['Title'],
-            values['Agenda'].split('/'),
-            values['Resolution'],
+            Array.from(new Set<string>(values['Agenda'].split('/'))),
+            resolutionCode,
+            parentResolutionUrl,
             values['Meeting record '],
-            values['Draft resolution'],
+            draftTextCode,
+            draftTextUrl,
             values['Committee report'],
             values['Note'],
             values['Vote summary'],
             voteDate,
+            this.url,
             votes,
             collections
         )
@@ -466,21 +566,92 @@ function report(msg: string) {
     console.log(msg)
 }
 
-export async function read_pages(start: number, end: number): Promise<Array<ResolutionDetailsPage>> {
-    let results: Array<ResolutionDetailsPage> = []
-    let cachedReader = new CachedAxiosUrlReader()
-    let reader = new AxiosUrlReader()
-    for(let page = start; page < end + 1; page++) {
-        report(`Reading page ${page} ...`)
-        let listPage = await new ResolutionListPageReader(page, reader).fetch()
-        report(`Fetching ${listPage.resolutions.length} items...`)
-        let i = 1
-        for(const ref of listPage.resolutions) {
-            report(`reading item: ${i}: ${ref.url}...`)
-            let detailsPage = await new ResolutionDetailsPageReader(ref, cachedReader).fetch()
-            results.push(detailsPage)
-            i++
-        }
+export async function read_pages(years: number[], batch: (result: {resolutions: ResolutionDetailsPage[], drafts: DraftResolutionPage[], year: number}) => Promise<void>): Promise<void> {
+    const resolutions: ResolutionDetailsPage[] = []
+    const drafts: DraftResolutionPage[] = []
+    const concurrent = 6
+    let numberOfPages = 0
+    let numberOfRecords = 0
+    let currentPage = 1
+    let running = 0
+    let j = 0
+    let listPage: ResolutionListPage = null
+    let listFreeze = false
+    let ref_queue: ResolutionReference[]
+    let yearIndex = 0
+
+    const gatewayPage = await new GatewayReader(new AxiosUrlReader()).fetch()
+    years = years || gatewayPage.years
+    report(`Total ${years.length} years...`)
+    const missing = years.filter((year) => gatewayPage.years.indexOf(year) == -1)
+    if(missing.length > 0) {
+        throw new Error(`missing years: ${missing}`)
     }
-    return results
+
+    const process_year = function() {
+        return new Promise<void>(async resolve => {
+            if(!listFreeze && numberOfPages) {
+                listFreeze = true
+                if(currentPage == numberOfPages) {
+                    batch({drafts: drafts, resolutions: resolutions, year: years[yearIndex]})
+                    if(yearIndex < years.length - 1) {
+                        yearIndex++
+                        currentPage = 1
+                    } else {
+                        resolve()
+                        return
+                    }
+                } else {
+                    currentPage++
+                }
+                listFreeze = false
+            }
+            listPage = await new ResolutionListPageReader(currentPage, years[yearIndex], new AxiosUrlReader()).fetch()
+            numberOfRecords = listPage.numberOfRecords
+            numberOfPages = ResolutionListPageReader.numberToPage(numberOfRecords)
+            ref_queue = Array.from(listPage.resolutions)
+            report(`LIST: ${years[yearIndex]}: ${currentPage} <${numberOfPages}/${numberOfRecords}>`)
+            j = 0
+            for(j;j<Math.min((concurrent - running), ref_queue.length);j++) {
+                process_details(ref_queue.pop())
+            }
+            listFreeze = false
+        })
+    }
+
+    const process_details = function(reference: ResolutionReference) {
+        return new Promise<void>(async (resolve) => {
+            running++
+            const details = await new ResolutionDetailsPageReader(reference, new CachedAxiosUrlReader())
+                .fetch()
+
+            resolutions.push(details)
+
+            report(`reading details: ${reference.resolutionCode} [${resolutions.length}]`)
+            if(details.draftResolutionUrl != null) {
+                const draft = await new DraftResolutionPageReader(details.draftResolutionUrl, new CachedAxiosUrlReader())
+                    .fetch()
+                drafts.push(draft)
+            }
+
+            running--
+            if(running < concurrent) {
+                let refFinished = false
+                for(let j=0;j<(concurrent - running);j++) {
+                    const ref = ref_queue.pop()
+                    if(ref != undefined) {
+                        process_details(ref)
+                    } else {
+                        refFinished = true
+                        break  
+                    }
+                }
+                if(refFinished && running == 0) {
+                    process_year()
+                }
+            }
+
+        })
+    }
+    process_year()
 }

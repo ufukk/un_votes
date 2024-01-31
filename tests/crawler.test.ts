@@ -1,8 +1,7 @@
-import exp from 'constants'
-import { HtmlParser, DraftResolutionPageReader, ResolutionListPageReader, ResolutionDetailsPageReader, ResolutionReference, UrlReader } from '../src/reader/crawler'
+import { HtmlParser, GatewayReader, DraftResolutionPageReader, ResolutionListPageReader, ResolutionDetailsPageReader, ResolutionReference, UrlReader } from '../src/reader/crawler'
 import * as fs from 'fs'
 
-class _FsReader extends UrlReader {
+class _FsReader implements UrlReader {
     
     private _data
 
@@ -27,6 +26,9 @@ class _FsReader extends UrlReader {
     }
     data() {
         return this._data
+    }
+    responseData() {
+        return {}
     }
 }
 
@@ -58,9 +60,18 @@ describe('unvotes tests', () => {
         
     })
     
+    test('Read years', async () => {
+        const reader = new _FsReader()
+        const pageReader = new GatewayReader(reader)
+        const page = await pageReader.fetch()
+        expect(page.years[0]).toBe(2023)
+        expect(page.years.length).toBe(78)
+        expect(page.years[77]).toBe(1946)
+    })
+
     test('ResolutionListPageReader', async () => {
         let reader = new _FsReader()
-        let pageReader = new ResolutionListPageReader(1, reader)
+        let pageReader = new ResolutionListPageReader(1, 2020, reader)
         let page = await pageReader.fetch()
         expect(page.numberOfRecords).toBe(22672)
         expect(page.resolutions.length).toBe(50)
@@ -73,9 +84,15 @@ describe('unvotes tests', () => {
         let ref = new ResolutionReference('', new Date(), '', 'details#1')
         let pageReader = new ResolutionDetailsPageReader(ref, reader)
         let page = await pageReader.fetch()
+        expect(page.title).toBe('Work of the Special Committee to Investigate Israeli Practices Affecting the Human Rights of the Palestinian People and Other Arabs of the Occupied Territories : resolution / adopted by the General Assembly')
+        expect(page.draftResolutionCode).toBe('A/C.4/78/L.13')
+        expect(page.draftResolutionUrl).toBe('https://digitallibrary.un.org/record/4026563?ln=en')
         expect(page.votes.size).toBe(193)
         expect(page.votes.get('TÜRKİYE')).toBe('Y')
         expect(page.votes.get('UNITED STATES')).toBe('N')
+        expect(page.collections.length).toBe(2)
+        expect(page.collections[0]).toBe('General Assembly Plenary')
+        expect(page.collections[1]).toBe('Voting Data')
     })
 
     test('DraftResolutionPageReader', async () => {

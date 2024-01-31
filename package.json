@@ -6,8 +6,9 @@
   "scripts": {
     "test": "jest",
     "build": "tsc",
-    "tsc:w": "tsc -w --outDir dist",
-    "start": "npm run build && node -e \"import('./dist/src/runner.js').then(m => m.main());\""
+    "importer": "npm run build && node dist/src/scripts/importer.js",
+    "start": "npm run build && node -e \"import('./dist/src/scripts/runner.js').then(m => m.main());\"",
+    "db": "npm run build && node dist/src/scripts/db.js"
   },
   "repository": {
     "type": "git",
@@ -31,6 +32,7 @@
   "dependencies": {
     "@types/jsdom": "^21.1.6",
     "axios": "^1.6.2",
+    "fast_array_intersect": "^1.1.0",
     "jsdom": "^23.0.1",
     "knex": "^3.1.0",
     "reflect-metadata": "^0.1.14",

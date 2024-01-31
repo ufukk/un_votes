@@ -1,5 +1,5 @@
 import "reflect-metadata"
-import { Entity, PrimaryGeneratedColumn, Column, JoinTable, OneToMany, DataSource, Repository, Unique, ManyToOne, ManyToMany } from "typeorm"
+import { Entity, PrimaryGeneratedColumn, Column, JoinTable, OneToMany, DataSource, Repository, Unique, ManyToOne, ManyToMany, In, OneToOne, JoinColumn } from "typeorm"
 
 export enum ResolutionType {
     GeneralCouncil = 1,
@@ -8,15 +8,42 @@ export enum ResolutionType {
 
 export enum ResolutionStatus {
     AdoptedWithoutVote = 1,
-    Recorded = 2,
-    NoMachineGeneratedVote = 3
+    VotedAndAdopted = 2,
+    VotedAndRejected = 3
 }
 
 export enum Vote {
     Abstained = 1,
     Yes = 2,
     No = 3,
-    Missing = 4
+    NonVoting = 4
+}
+
+@Entity()
+export class ReadCursor {
+
+    @Column({primary: true, length: 50})
+    cursorId: string
+
+    @Column({nullable: true})
+    lastDate: Date
+
+    @Column({nullable: true})
+    lastPage: number
+}
+
+@Entity()
+@Unique(['slug', 'alias'])
+export class SlugAlias {
+
+    @PrimaryGeneratedColumn()
+    slugId: number
+
+    @Column({length: 50})
+    slug: string
+
+    @Column({length: 50})
+    alias: string
 }
 
 @Entity()
@@ -31,12 +58,28 @@ export class Country {
     @Column({unique: true})
     un_name: string
     
+    @Column({unique: true})
+    slug: string
+
     @Column({unique: true, nullable: true})
     alpha2: string
     
     @Column({unique: true, nullable: true})
     fipscode: number
+}
 
+@Entity()
+export class Author {
+
+    @PrimaryGeneratedColumn()
+    author_id: number
+
+    @Column({unique: true})
+    authorName: string
+
+    @OneToOne(() => Country, {eager: true, nullable: true})
+    @JoinColumn()
+    country: Country | null
 }
 
 @Entity()
@@ -68,25 +111,36 @@ export class DraftResolution {
     @PrimaryGeneratedColumn()
     draftResolutionId: number
 
+    @Column({unique: true})
     symbol: string
 
+    @Column({})
     title: string
 
+    @Column({nullable: true})
     access: string
 
+    @Column({nullable: true})
     resolutionOrDecision: string
 
-    @ManyToMany(() => Country, {eager: true})
+    @ManyToMany(() => Author, {eager: true})
     @JoinTable()
-    authors: Country[]
+    authors: Author[]
 
+    @Column({nullable: true})
     agendaInformation: string
 
+    @Column({})
     date: Date
 
+    @Column({nullable: true})
     description: string
 
+    @Column({nullable: true})
     notes: string
+
+    @Column({unique: true})
+    detailsUrl: string
 
     @ManyToMany(() => Subject, {eager: true})
     @JoinTable()
@@ -109,7 +163,7 @@ export class Resolution {
     @Column()
     resolutionStatus: ResolutionStatus
     
-    @ManyToOne(() => DraftResolution, (draft) => draft.resolutions)
+    @ManyToOne(() => DraftResolution, (draft) => draft.resolutions, {eager: true})
     draftResolution: DraftResolution
 
     @Column()
@@ -118,21 +172,24 @@ export class Resolution {
     @Column({unique: true})
     resolutionCode: string
 
-    @Column()
+    @Column({nullable: true})
     meetingRecordCode: string
     
-    @Column()
+    @Column({nullable: true})
     draftResolutionCode: string
     
-    @Column()
+    @Column({nullable: true})
     note: string
     
-    @Column()
+    @Column({nullable: true})
     voteSummary: string
     
     @Column()
     voteDate: Date
     
+    @Column({unique: true})
+    detailsUrl: string
+
     @OneToMany(() => ResolutionVote, (vote) => vote.resolution, {eager: true, cascade: true})
     votes: ResolutionVote[]
 
@@ -159,9 +216,10 @@ export class ResolutionVote {
     vote: Vote
 }
 
-export const dataSource = new DataSource({
+export const defaultDataSource = new DataSource({
     type: 'sqlite',
-    database: 'storage/votes.db'
+    database: 'storage/votes.db',
+    entities: [Subject, DraftResolution, Resolution, Author, Country, Agenda, ResolutionVote, SlugAlias, ReadCursor]
 })
 
 class BaseRepository<T> extends Repository<T> {
@@ -207,7 +265,6 @@ export class ResolutionRepository extends BaseRepository<Resolution> {
     }
 }
 
-
 export class ResolutionVoteRepository extends BaseRepository<ResolutionVote> {
 
     static createInstance(dataSource: DataSource): ResolutionVoteRepository {
@@ -222,8 +279,18 @@ export class CountryRepository extends BaseRepository<Country> {
         return new CountryRepository(Country, dataSource.createEntityManager())
     }
 
-    async fetchByUnName(name: string): Promise<Country> {
-        return await this.findOneBy({un_name: name})
+    async fetchBySlugs(slugs: string[]): Promise<Country> {
+        return await this.findOne({
+            where: {slug: In(slugs)}
+        })
+    }
+
+}
+
+export class AuthorRepository extends BaseRepository<Author> {
+
+    static createInstance(dataSource: DataSource): AuthorRepository {
+        return new AuthorRepository(Author, dataSource.createEntityManager())
     }
 
 }
@@ -238,4 +305,38 @@ export class AgendaRepository extends BaseRepository<Agenda> {
         return await this.findOneBy({un_name: name})
     }
 
+}
+
+export class SubjectRepository extends BaseRepository<Subject> {
+
+    static createInstance(dataSource: DataSource): SubjectRepository {
+        return new SubjectRepository(Subject, dataSource.createEntityManager())
+    }
+
+    async fetchByName(name: string): Promise<Subject> {
+        return await this.findOneBy({subjectName: name})
+    }
+
+}
+
+export class DraftResolutionRepository extends BaseRepository<DraftResolution> {
+    static createInstance(dataSource: DataSource): DraftResolutionRepository {
+        return new DraftResolutionRepository(DraftResolution, dataSource.createEntityManager())
+    }
+}
+
+export class SlugAliasRepository extends BaseRepository<SlugAlias> {
+    static createInstance(dataSource: DataSource): SlugAliasRepository {
+        return new SlugAliasRepository(SlugAlias, dataSource.createEntityManager())
+    }
+}
+
+export class ReadCursorRepository extends BaseRepository<ReadCursor> {
+   static createInstance(dataSource: DataSource): ReadCursorRepository {
+        return new ReadCursorRepository(ReadCursor, dataSource.createEntityManager())
+    }
+}
+
+export function make_slug(str: string): string {
+    return str.trim().normalize('NFKD').toLowerCase().replace(' ','-').replace(/[^\w\-]/g, '')
 }
