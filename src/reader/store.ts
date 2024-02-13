@@ -1,9 +1,11 @@
-import { Subject, Country, Resolution, Agenda, Author, Vote, ResolutionVote, ResolutionType, ResolutionStatus, CountryRepository, AgendaRepository, DraftResolution, SubjectRepository, DraftResolutionRepository, make_slug, SlugAlias, SlugAliasRepository, ResolutionRepository, AuthorRepository } from "./models"
-import { DraftResolutionPage, ResolutionDetailsPage, YES_VALUE, NO_VALUE, ABSTENTION_VALUE, NONVOTING_VALUE } from './crawler'
-import { Auth, DataSource, Repository } from "typeorm"
+import { Subject, Country, Resolution, Agenda, Author, Vote, ResolutionVote, ResolutionType, ResolutionStatus, CountryRepository, AgendaRepository, SubjectRepository, ResolutionRepository, make_slug, SlugAlias, SlugAliasRepository, AuthorRepository, VotingType, DocumentUrl } from "./models"
+import { ResolutionPage, YES_VALUE, NO_VALUE, ABSTENTION_VALUE, NONVOTING_VALUE } from './crawler'
+import { DataSource, Repository } from "typeorm"
 import { report } from '../utils'
 
-type Transformable = Subject | Country | Resolution | Agenda | ResolutionVote | ResolutionVote | DraftResolution | Author
+type Transformable = Subject | Country | Resolution | Agenda | ResolutionVote | ResolutionVote | Author | DocumentUrl
+
+type DocumentUrlItem = { language: string, url: string }
 
 export class TransformationError extends Error {
 
@@ -22,7 +24,7 @@ abstract class Transformer<K, T extends Transformable> {
 
     abstract transform(item: K): Promise<T>
 
-    abstract isNew(item: T): boolean
+    abstract exists(item: T): Promise<boolean>
 
     async save(item: T): Promise<T> {
         return this.repository.save(item)
@@ -30,7 +32,7 @@ abstract class Transformer<K, T extends Transformable> {
 
     async ensureExists(item: K) {
         let entity = await this.transform(item)
-        if(this.isNew(entity)) {
+        if(!(await this.exists(entity))) {
             entity = await this.repository.save(entity)
         }
         return entity
@@ -69,14 +71,25 @@ export class CountryNameTransformer extends Transformer<string, Country> {
         return country
     }
 
-    isNew(item: Country): boolean {
-        return item.country_id == undefined
-    }
-
     async exists(item: Country): Promise<boolean> {
         return (await this.repository.countBy({slug: item.slug})) > 0
     }
 
+}
+
+export class DocumentUrlTransformer extends Transformer<DocumentUrlItem, DocumentUrl> {
+    
+    async transform(item: DocumentUrlItem): Promise<DocumentUrl> {
+        const model = new DocumentUrl()
+        model.language = item['language']
+        model.url = item['url']
+        return model
+    }
+
+    exists(item: DocumentUrl): Promise<boolean> {
+        return new Promise<boolean>(() => { return false })
+    }
+    
 }
 
 export class AuthorTransformer extends Transformer<string, Author> {
@@ -96,7 +109,7 @@ export class AuthorTransformer extends Transformer<string, Author> {
         if(author == null) {
             const countryTransformer = new CountryNameTransformer(this.dataSource)
             let country = await countryTransformer.transform(item)
-            if(countryTransformer.isNew(country)) {
+            if(!(await countryTransformer.exists(country))) {
                 country = null
             }
             author = new Author()
@@ -106,7 +119,7 @@ export class AuthorTransformer extends Transformer<string, Author> {
         return author
     }
     
-    isNew(item: Author): boolean {
+    async exists(item: Author): Promise<boolean> {
         return item.author_id == undefined
     }
 
@@ -133,10 +146,6 @@ export class AgendaNameTransformer extends Transformer<string, Agenda> {
             agenda.un_name = item
         }
         return agenda
-    }
-
-    isNew(item: Agenda): boolean {
-        return item.agenda_id == undefined
     }
 
     async exists(item: Agenda): Promise<boolean> {
@@ -168,30 +177,30 @@ export class SubjectTransformer extends Transformer<string, Subject> {
         return subject
     }
 
-    isNew(item: Subject): boolean {
-        return item.subjectId == undefined
-    }
-
     async exists(item: Subject): Promise<boolean> {
         return (await this.repository.countBy({subjectName: item.subjectName})) > 0
     }
 
 }
 
-export class ResolutionDetailsPageTransformer extends Transformer<ResolutionDetailsPage, Resolution> {
+export class ResolutionTransformer extends Transformer<ResolutionPage, Resolution> {
     
     protected repository: ResolutionRepository
     protected agendaTransformer: AgendaNameTransformer
-    protected draftRepository: DraftResolutionRepository
+    protected subjectTransformer: SubjectTransformer
+    protected authorTransformer: AuthorTransformer
+    protected documentUrlTransformer: DocumentUrlTransformer
 
     public constructor(dataSource: DataSource) {
         super(dataSource)
         this.repository = ResolutionRepository.createInstance(this.dataSource)
         this.agendaTransformer = new AgendaNameTransformer(this.dataSource)
-        this.draftRepository = DraftResolutionRepository.createInstance(this.dataSource)
+        this.subjectTransformer = new SubjectTransformer(this.dataSource)
+        this.authorTransformer = new AuthorTransformer(this.dataSource)
+        this.documentUrlTransformer = new DocumentUrlTransformer(this.dataSource)
     }   
 
-    private async __votes(item: ResolutionDetailsPage) {
+    private async __votes(item: ResolutionPage) {
         let votes: ResolutionVote[] = []
         for(const [key, value] of item.votes.entries()) {
             let tr = new ResolutionVoteTransformer(this.dataSource)
@@ -200,7 +209,7 @@ export class ResolutionDetailsPageTransformer extends Transformer<ResolutionDeta
         return votes
     }
 
-    private async __agendas(item: ResolutionDetailsPage) {
+    private async __agendas(item: ResolutionPage) {
         let agendas: Agenda[] = []
         item.agendas.forEach(async (name) => {
             agendas.push(await this.agendaTransformer.ensureExists(name))
@@ -208,17 +217,17 @@ export class ResolutionDetailsPageTransformer extends Transformer<ResolutionDeta
         return agendas
     }
 
-    private findResolutionType(item: ResolutionDetailsPage): ResolutionType {
-        if(item.resolutionCode.startsWith('A/')) {
-            return ResolutionType.GeneralCouncil
-        } else if(item.resolutionCode.startsWith('S/')) {
-            return ResolutionType.SecurityCouncil
+    private findResolutionType(item: ResolutionPage): VotingType {
+        if(item.symbol.startsWith('A/')) {
+            return VotingType.GeneralCouncil
+        } else if(item.symbol.startsWith('S/')) {
+            return VotingType.SecurityCouncil
         }
-        throw new TransformationError(item, `Resolution type could not be determined <${item.resolutionCode}>`)
+        throw new TransformationError(item, `Resolution type could not be determined <${item.symbol}>`)
     }
 
-    private findResolutionStatus(item: ResolutionDetailsPage): ResolutionStatus {
-        if(item.note && item.note.match(/ADOPTED WITHOUT VOTE/)) {
+    private findResolutionStatus(item: ResolutionPage): ResolutionStatus {
+        if(item.notes && item.notes.match(/ADOPTED WITHOUT VOTE/)) {
             return ResolutionStatus.AdoptedWithoutVote
         } else if(item.votes.size > 0) {
             return ResolutionStatus.VotedAndAdopted
@@ -226,44 +235,54 @@ export class ResolutionDetailsPageTransformer extends Transformer<ResolutionDeta
         if(item.voteSummary && (item.voteSummary.match(/Adopted/) || item.voteSummary.match(/Voting Summary/))) {
             return ResolutionStatus.VotedAndAdopted
         }
-        throw new TransformationError(item, `Resolution status could not be determined <${item.resolutionCode}> | <${item.note}>`)
+        throw new TransformationError(item, `Resolution status could not be determined <${item.resolutionCode}> | <${item.notes}>`)
     }
 
-    async findDraftResolution(item: ResolutionDetailsPage): Promise<DraftResolution | null> {
-        if(item.draftResolutionCode) {
-            const draft = await this.draftRepository.findOneBy({symbol: item.draftResolutionCode})
-            return draft
+    private async __subjects(item: ResolutionPage): Promise<Subject[]> {
+        const results: Subject[] = []
+        for(const name of item.subjects) {
+            results.push(await this.subjectTransformer.ensureExists(name))
         }
-        return null
+        return results
     }
 
-    async transform(item: ResolutionDetailsPage): Promise<Resolution> {
-        const draft = await this.findDraftResolution(item)
+    private async __authors(item: ResolutionPage): Promise<Author[]> {
+        const results: Author[] = []
+        for(const name of item.authors) {
+            results.push(await this.authorTransformer.ensureExists(name))
+        }
+        return results
+    }
+
+    private async __documentUrls(item: ResolutionPage): Promise<DocumentUrl[]> {
+        const models: DocumentUrl[] = []
+        for(const key in item.textLinks) {
+            models.push(await this.documentUrlTransformer.transform({language: key, url: item.textLinks[key]}))
+        }
+        return models
+    }
+
+
+    async transform(item: ResolutionPage): Promise<Resolution> {
         let resolution = new Resolution()
-        resolution.resolutionType = this.findResolutionType(item)
+        resolution.symbol = item.symbol
+        resolution.votingType = this.findResolutionType(item)
         resolution.resolutionStatus = this.findResolutionStatus(item)
-        resolution.draftResolutionCode = item.draftResolutionCode
-        resolution.meetingRecordCode = item.meetingRecordCode
-        resolution.note = item.note
-        resolution.resolutionCode = item.resolutionCode
+        resolution.note = item.notes
         resolution.title = item.title
-        resolution.voteDate = item.voteDate
+        resolution.date = item.date
         resolution.detailsUrl = item.detailsUrl
         resolution.voteSummary = item.voteSummary
         resolution.agendas = await this.__agendas(item)
         resolution.votes = await this.__votes(item)
-        if(draft) {
-            resolution.draftResolution = draft
-        }
+        resolution.subjects = await this.__subjects(item)
+        resolution.authors = await this.__authors(item)
+        resolution.documentUrls = await this.__documentUrls(item)
         return resolution
     }
 
-    isNew(item: Resolution): boolean {
-        return item.resolutionId == undefined
-    }
-
     async exists(item: Resolution): Promise<boolean> {
-        return (await this.repository.countBy({resolutionCode: item.resolutionCode})) > 0
+        return (await this.repository.countBy({symbol: item.symbol})) > 0
     }
 
 }
@@ -300,57 +319,3 @@ export class ResolutionVoteTransformer extends Transformer<[string, string], Res
 
 }
 
-export class DraftResolutionTransformer extends Transformer<DraftResolutionPage, DraftResolution> {
-    
-    subjectTransformer: SubjectTransformer
-    authorTransformer: AuthorTransformer
-    protected repository: DraftResolutionRepository
-
-    constructor(protected readonly dataSource: DataSource) {
-        super(dataSource)
-        this.subjectTransformer = new SubjectTransformer(this.dataSource)
-        this.authorTransformer = new AuthorTransformer(this.dataSource)
-        this.repository = DraftResolutionRepository.createInstance(this.dataSource)
-    }
-
-    private async __subjects(item: DraftResolutionPage): Promise<Subject[]> {
-        const results: Subject[] = []
-        for(const name of item.subjects) {
-            results.push(await this.subjectTransformer.ensureExists(name))
-        }
-        return results
-    }
-
-    private async __authors(item: DraftResolutionPage): Promise<Author[]> {
-        const results: Author[] = []
-        for(const name of item.authors) {
-            results.push(await this.authorTransformer.ensureExists(name))
-        }
-        return results
-    }
-
-    async transform(item: DraftResolutionPage): Promise<DraftResolution> {
-        const draft = new DraftResolution()
-        draft.access = item.access
-        draft.agendaInformation = item.agendaInformation
-        draft.date = item.date
-        draft.description = item.description
-        draft.notes = item.notes
-        draft.resolutionOrDecision = item.resolutionOrDecision
-        draft.symbol = item.symbol
-        draft.title = item.title
-        draft.detailsUrl = item.detailsUrl
-        draft.subjects = await this.__subjects(item)
-        draft.authors = await this.__authors(item)
-        return draft
-    }
-
-    isNew(item: DraftResolution): boolean {
-        return item.draftResolutionId == undefined
-    }
-
-    async exists(item: DraftResolution): Promise<boolean> {
-        return (await this.repository.countBy({symbol: item.symbol})) > 0
-    }
-    
-}

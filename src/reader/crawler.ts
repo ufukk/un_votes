@@ -15,7 +15,7 @@ class AttributeError extends Error {
     }
 }
 
-export class ResolutionReference {
+export class DocumentReference {
 
     constructor(
         public readonly title: string,
@@ -26,16 +26,11 @@ export class ResolutionReference {
     }
 }
 
-export interface Cascading {
-
-    
-}
-
-class ResolutionListPage {
+class DocumentListPage {
 
     constructor(
         public readonly numberOfRecords: number,
-        public readonly resolutions: Array<ResolutionReference>) {
+        public readonly resolutions: Array<DocumentReference>) {
     }
 }
 
@@ -45,8 +40,14 @@ class ResolutionCursor {
         public readonly start: number,
         public readonly end: number,
         public readonly page: number,
-        public readonly resolutionList: ResolutionListPage) {
+        public readonly resolutionList: DocumentListPage) {
     }
+}
+
+class CodeUrl {
+
+    public constructor(public readonly code: string,
+        public readonly url: string = null) {}
 }
 
 export const YES_VALUE = 'Y'
@@ -57,29 +58,160 @@ export const ABSTENTION_VALUE = 'A'
 
 export const NONVOTING_VALUE = '-'
 
-export class ResolutionDetailsPage {
+export type TextLinks = Record<string, string>
 
-    constructor(public readonly title: string,
-        public readonly agendas: string[],
-        public readonly resolutionCode: string,
-        public readonly parentResolutionUrl: string,
-        public readonly meetingRecordCode: string,
-        public readonly draftResolutionCode: string,
-        public readonly draftResolutionUrl: string,
-        public readonly committeeReportCode: string,
-        public readonly note: string,
-        public readonly voteSummary: string,
-        public readonly voteDate: Date,
-        public readonly detailsUrl: string,
-        public readonly votes: Map<string, string>,
-        public readonly collections: string[]
-    ) {  
+interface IDocument {
+    readonly symbol?: string
+    readonly title: string
+    readonly alternativeTitles?: string[]
+    readonly actionNote?: string
+    readonly agendas?: string[]
+    readonly resolutionCode?: CodeUrl
+    readonly meetingRecordCode?: CodeUrl
+    readonly draftResolutionCode?: CodeUrl
+    readonly committeeReportCode?: CodeUrl
+    readonly callNumber?: string
+    readonly voteSummary?: string
+    readonly detailsUrl?: string
+    readonly votes?: Map<string, string>
+    readonly collections: string[]
+    readonly resolutionOrDecision?: string
+    readonly authors?: string[]
+    readonly agendaInformation?: string
+    readonly date: Date
+    readonly description?: string
+    readonly notes?: string
+    readonly subjects?: string[]
+    readonly textLinks?: TextLinks
+}
 
-        
-      }
+export class ResolutionPage implements IDocument {
+
+    readonly symbol?: string
+    readonly title: string
+    readonly alternativeTitles?: string[]
+    readonly actionNote?: string
+    readonly agendas?: string[]
+    readonly resolutionCode?: CodeUrl
+    readonly meetingRecordCode?: CodeUrl
+    readonly draftResolutionCode?: CodeUrl
+    readonly committeeReportCode?: CodeUrl
+    readonly callNumber?: string
+    readonly voteSummary?: string
+    readonly detailsUrl?: string
+    readonly votes?: Map<string, string>
+    readonly collections: string[]
+    readonly resolutionOrDecision?: string
+    readonly authors?: string[]
+    readonly agendaInformation?: string
+    readonly date: Date
+    readonly description?: string
+    readonly notes?: string
+    readonly subjects?: string[]
+    readonly textLinks?: TextLinks
+
+    constructor(votingData: DocumentPage, resolutionOrDraft: DocumentPage=null) {
+        this.voteSummary = votingData.voteSummary
+        this.votes = votingData.votes
+        this.symbol = resolutionOrDraft.symbol || votingData.resolutionCode.code
+        this.title = resolutionOrDraft.title
+        this.textLinks = resolutionOrDraft.textLinks
+        this.actionNote = resolutionOrDraft.actionNote
+        this.draftResolutionCode = resolutionOrDraft.draftResolutionCode
+        this.committeeReportCode = resolutionOrDraft.committeeReportCode
+        this.meetingRecordCode = resolutionOrDraft.meetingRecordCode
+        this.authors = resolutionOrDraft.authors
+        this.agendas = resolutionOrDraft.agendas
+        this.date = votingData.date
+        this.description = resolutionOrDraft.description
+        this.notes = resolutionOrDraft.notes
+        this.collections = resolutionOrDraft.collections
+        this.subjects = resolutionOrDraft.subjects
+        this.detailsUrl = resolutionOrDraft.detailsUrl
+    }
+
+}
+
+export class DocumentPage implements IDocument {
+
+    readonly symbol?: string
+    readonly title: string
+    readonly alternativeTitles?: string[]
+    readonly actionNote?: string
+    readonly agendas?: string[]
+    readonly resolutionCode?: CodeUrl
+    readonly meetingRecordCode?: CodeUrl
+    readonly draftResolutionCode?: CodeUrl
+    readonly committeeReportCode?: CodeUrl
+    readonly callNumber?: string
+    readonly voteSummary?: string
+    readonly detailsUrl?: string
+    readonly votes?: Map<string, string>
+    readonly collections: string[]
+    readonly resolutionOrDecision?: string
+    readonly authors?: string[]
+    readonly agendaInformation?: string
+    readonly date: Date
+    readonly description?: string
+    readonly notes?: string
+    readonly subjects?: string[]
+    readonly textLinks?: TextLinks
+
+    constructor({
+        symbol, 
+        title,
+        alternativeTitles = [],
+        agendas = [],
+        resolutionCode = null,
+        meetingRecordCode = null,
+        draftResolutionCode = null,
+        committeeReportCode = null,
+        callNumber = null,
+        voteSummary = null,
+        detailsUrl = null,
+        votes = null,
+        collections = [],
+        resolutionOrDecision = null,
+        authors = [],
+        agendaInformation = null,
+        date,
+        description = null,
+        notes = null,
+        subjects = [],
+        textLinks = null
+    }: IDocument
+    ) {
+        this.symbol = symbol
+        this.title = title
+        this.alternativeTitles = alternativeTitles
+        this.agendas = agendas
+        this.resolutionCode = resolutionCode
+        this.meetingRecordCode = meetingRecordCode
+        this.draftResolutionCode = draftResolutionCode
+        this.committeeReportCode = committeeReportCode
+        this.callNumber = callNumber
+        this.voteSummary = voteSummary
+        this.detailsUrl = detailsUrl
+        this.votes = votes
+        this.collections = collections
+        this.resolutionOrDecision = resolutionOrDecision
+        this.authors = authors
+        this.agendaInformation = agendaInformation
+        this.date = date
+        this.description = description
+        this.notes = notes
+        this.subjects = subjects
+        this.textLinks = textLinks
+    }
 
     protected _votesByValue(value: string): string[] {
-        return Array.from(this.votes.keys()).filter((key) => this.votes.get(key) == value)
+        const keys = []
+        for(const key in this.votes) {
+            if(this.votes[key] == value) {
+                keys.push(key)
+            }
+        }
+        return keys
     }
 
     public yes_votes(): string[] {
@@ -98,25 +230,6 @@ export class ResolutionDetailsPage {
         return this._votesByValue(NONVOTING_VALUE)
     }
 }
-
-export class DraftResolutionPage {
-
-    constructor(public readonly symbol: string,
-        public readonly title: string,
-        public readonly access: string,
-        public readonly resolutionOrDecision,
-        public readonly authors: string[],
-        public readonly agendaInformation: string,
-        public readonly date: Date,
-        public readonly description: string,
-        public readonly notes: string,
-        public readonly detailsUrl: string,
-        public readonly collections: string[],
-        public readonly subjects: string[],
-                
-    ) {}
-}
-
 
 export class HtmlParser {
 
@@ -332,11 +445,7 @@ abstract class PageReader<T> {
 }
 
 class GatewayPage {
-
-
-    public constructor(public readonly years: number[]) { 
-    }
-
+    public constructor(public readonly years: number[]) {}
 }
 
 export class GatewayReader extends PageReader<GatewayPage> {
@@ -360,7 +469,7 @@ export class GatewayReader extends PageReader<GatewayPage> {
 
 }
 
-export class ResolutionListPageReader extends PageReader<ResolutionListPage> {
+export class DocumentListPageReader extends PageReader<DocumentListPage> {
     
     static readonly pageSize: number = 50
     static readonly rootUrl = 'https://digitallibrary.un.org'
@@ -376,12 +485,11 @@ export class ResolutionListPageReader extends PageReader<ResolutionListPage> {
     }
 
     constructor(public readonly page: number, public readonly year: number, reader: UrlReader) {
-        super(ResolutionListPageReader.getUrl(page, year), reader)
-        report(`URL: ${this.url}`)
+        super(DocumentListPageReader.getUrl(page, year), reader)
     }
 
     public static numberToPage(total: number): number {
-        return Math.ceil(total / ResolutionListPageReader.pageSize)
+        return Math.ceil(total / DocumentListPageReader.pageSize)
     }
 
     protected _readQueries(): Record<string, string> {
@@ -398,12 +506,12 @@ export class ResolutionListPageReader extends PageReader<ResolutionListPage> {
             values['references'].push({
                 'title': el.textContent,
                 'brief-options': briefOptions[i].textContent,
-                'url': ResolutionListPageReader.rootUrl + links[i]})
+                'url': DocumentListPageReader.rootUrl + links[i]})
         })
         return values
     }
 
-    protected _parse(): ResolutionListPage {
+    protected _parse(): DocumentListPage {
         let values = this._readQueries()
         let references = []
         let numberOfRecords = Number.parseInt(values['numberOfRecords'])
@@ -414,79 +522,43 @@ export class ResolutionListPageReader extends PageReader<ResolutionListPage> {
             let code = options[0]
             let dt = options[1].trim()
             let date = new Date(Date.parse(dt))
-            references.push(new ResolutionReference(title, date, code, url))
+            references.push(new DocumentReference(title, date, code, url))
         }
-        return new ResolutionListPage(numberOfRecords, references)
+        return new DocumentListPage(numberOfRecords, references)
     }
 }
 
-export class DraftResolutionPageReader extends PageReader<DraftResolutionPage> {
-    
-    protected _readQueries(): Record<string, any> {
-        let results = {}
-        let titles = this._parser.search('span.title')
-        let values = this._parser.search('span.value')
-        let htmlFields = ['Authors', 'Collections']
-        titles.forEach((el: Element, index) => {
-            let name = el.textContent.trim()
-            let value = htmlFields.includes(name) ? values[index].innerHTML.trim() : values[index].textContent.trim()
-            results[name] = value
-        })
-        return results
-    }
 
-    private __getAuthors(authorStr: string): string[] {
-        return Array.from(new Set<string>(Array.from(authorStr.matchAll(/<a[^>]*href=\"([^\"]+)\"[^>]*>([\w ]+)<\/a>/g))
-        .map((match: RegExpExecArray) => match[2])))
-    }
+export abstract class DocumentPageReader extends PageReader<DocumentPage> {
 
-    private __getDate(value: string): Date {
-        const dateStr = value.substring(value.indexOf(',') + 1)
-        return new Date(Date.parse(dateStr))
-    }
-
-    private __getSubjects(): string[] {
-        const container = this._parser.find('ul.rs-group-list')
-        return Array.from(new Set<string>(Array.from(container.querySelectorAll('a.rs-link'))
-        .map((el: Element) => el.textContent)))
-    }
-
-    protected _parse(): DraftResolutionPage {
-        let values = this._readQueries()
-        let collections = []
-        values['Collections'].split(/<[ ]*br[ \/]*>/).forEach((txt: string) => {
-            collections.push(txt.replace(/<\/?[^>]+(>|$)/g, ''))
-        })
-        
-        let resolution = new DraftResolutionPage(
-            values['Symbol'],
-            values['Title'],
-            values['Access'],
-            values['Resolution / Decision'],
-            values['Authors'] ? this.__getAuthors(values['Authors']) : [],
-            values['Agenda information '],
-            this.__getDate(values['Date']),
-            values['Description'],
-            values['Notes'],
-            this.url,
-            collections,
-            this.__getSubjects()
-        )
-        return resolution
-    }
-    
-}
-
-export class ResolutionDetailsPageReader extends PageReader<ResolutionDetailsPage> {
-    
-
-    constructor(public readonly reference: ResolutionReference, reader: UrlReader) {
+    constructor(public readonly reference: DocumentReference, reader: UrlReader) {
         super(reference.url, reader)
     }
 
-    private __getVotes(value: string): Map<string, string> {
+    protected _getAuthors(authorStr: string): string[] {
+        return Array.from(new Set<string>(Array.from(authorStr.matchAll(/<a[^>]*href=\"([^\"]+)\"[^>]*>([^<]+)<\/a>/gi))
+        .map((match: RegExpExecArray) => match[2])))
+    }
+
+    protected _getAgendas(value: string): string[] {
+        return Array.from(new Set<string>(Array.from(value.matchAll(/<a[^>]*href=\"([^\"]+)\"[^>]*>([^<]+)<\/a>/gi))
+        .map((match: RegExpExecArray) => match[2])))
+    }
+
+    protected _getDate(value: string): Date {
+        const dateStr = value.substring(value.indexOf(',') + 1).trim()
+        return new Date(dateStr)
+    }
+
+    protected _getSubjects(): string[] {
+        const container = this._parser.find('ul.rs-group-list')
+        return Array.from(new Set<string>(Array.from(container.querySelectorAll('a.rs-link'))
+                    .map((el: Element) => el.textContent)))
+    }
+
+    protected _getVotes(value: string): Map<string, string> {
         let votes = new Map<string, string>()
-        if (value == undefined) {
+        if (!value) {
             return votes
         }
         let matches = value.matchAll(/ *([YNA] )*([^<>]{4,})/g)
@@ -499,16 +571,41 @@ export class ResolutionDetailsPageReader extends PageReader<ResolutionDetailsPag
                 break
             let name = m[2]
             let vote = m[1] ? m[1].trim() : NONVOTING_VALUE
-            votes.set(name, vote)
+            votes[name] = vote
         }
         return votes
+    }
+
+    protected _getTextLinks(value: string): Record<string, string> {
+        const links = {}
+        if(!value) {
+            return links
+        }
+        const langs = Array.from(value.matchAll(/<strong>([^<:]+):*<\/strong>/gim))
+            .map((m) => m[1])
+        const urls = Array.from(value.matchAll(/<a[^>]+href="([^>]+)">/gim))
+            .map((m) => m[1])
+        for(let i = 0; i < langs.length; i++) {
+            links[langs[i]] = DocumentListPageReader.rootUrl + urls[i]
+        }
+        return links
+    }
+
+    protected _readCollections(value: string) {
+        const collections = []
+        const separator = '&gt;'
+        value.split(/<[ ]*br[ \/]*>/).forEach((txt: string) => {
+            const parts = txt.replace(/<\/?[^>]+(>|$)/g, '').split(separator)
+            collections.push(parts[parts.length - 1].trim())
+        })
+        return collections
     }
 
     protected _readQueries(): Record<string, any> {
         let results = {}
         let titles = this._parser.search('span.title')
         let values = this._parser.search('span.value')
-        let htmlFields = ['Vote', 'Collections', 'Draft resolution', 'Resolution']
+        let htmlFields = ['Vote', 'Collections', 'Draft resolution', 'Resolution', 'Resolution / Decision', 'Committee report', 'Access', 'Agenda information', 'Agenda', 'Authors']
         titles.forEach((el: Element, index) => {
             let name = el.textContent.trim()
             let value = htmlFields.includes(name) ? values[index].innerHTML.trim() : values[index].textContent.trim()
@@ -517,67 +614,131 @@ export class ResolutionDetailsPageReader extends PageReader<ResolutionDetailsPag
         return results
     }
 
-    private __readDraftValues(value: string): [string, string] {
-        if(value == null) {
-            return [null, null]
-        }
+    protected _readCodeUrl(value: string): CodeUrl {
         const matches = value.match(/<a[^>]+href="([^"]+)">([^<]+)<\/a>/)
-        return matches ? [matches[2], matches[1]] : [value, null]
+        return matches ? new CodeUrl(matches[2], matches[1]) : new CodeUrl(value, null)
     }
 
-    protected _parse(): ResolutionDetailsPage {
+}
+
+export class VotingDataReader extends DocumentPageReader {
+
+    protected _parse(): DocumentPage { 
         const values: Record<string, string> = this._readQueries()
-        const voteDate = new Date(Date.parse(values['Vote date']))
-        const collections = []
-        const separator = '&gt;'
-        values['Collections'].split(/<[ ]*br[ \/]*>/).forEach((txt: string) => {
-            const parts = txt.replace(/<\/?[^>]+(>|$)/g, '').split(separator)
-            collections.push(parts[parts.length - 1].trim())
+        return new DocumentPage({
+            title: values['Title'],
+            resolutionCode: this._readCodeUrl(values['Resolution']),
+            agendas: this._getAgendas(values['Agenda']),
+            meetingRecordCode: this._readCodeUrl(values['Meeting record']),
+            draftResolutionCode: this._readCodeUrl(values['Draft resolution']),
+            committeeReportCode: this._readCodeUrl(values['Committee report']),
+            notes: values['Note'],
+            date: this._getDate(values['Vote date']),
+            voteSummary: values['Vote summary'],
+            votes: this._getVotes(values['Vote']),
+            collections: this._readCollections(values['Collections'])
         })
-        const votes = this.__getVotes(values['Vote'])
-        let [draftTextCode, draftTextUrl] = this.__readDraftValues(values['Draft resolution'])
-        const [resolutionCode, parentResolutionUrl] = this.__readDraftValues(values['Resolution'])
-        /* workaround for resolutions without a draft: use resolution instead. */
-        if(!draftTextCode && parentResolutionUrl) {
-            draftTextCode = resolutionCode
-            draftTextUrl = parentResolutionUrl
-        }
-        const resolution = new ResolutionDetailsPage(
-            values['Title'],
-            Array.from(new Set<string>(values['Agenda'].split('/'))),
-            resolutionCode,
-            parentResolutionUrl,
-            values['Meeting record '],
-            draftTextCode,
-            draftTextUrl,
-            values['Committee report'],
-            values['Note'],
-            values['Vote summary'],
-            voteDate,
-            this.url,
-            votes,
-            collections
-        )
-        return resolution
     }
+
+}
+
+export class ResolutionReader extends DocumentPageReader {
+
+    protected _parse(): DocumentPage {
+        const values: Record<string, string> = this._readQueries()
+        return new DocumentPage({
+            symbol: values['Symbol'],
+            title: values['Title'],
+            textLinks: this._getTextLinks(values['Access']),
+            date: this._getDate(values['Action note']),
+            voteSummary: values['Vote summary'],
+            draftResolutionCode: this._readCodeUrl(values['Draft']),
+            committeeReportCode: this._readCodeUrl(values['Committee report']),
+            meetingRecordCode: this._readCodeUrl(values['Meeting record']),
+            authors: this._getAuthors(values['Authors']),
+            agendas: this._getAgendas(values['Agenda information']),
+            description: values['Description'],
+            notes: values['Notes'],
+            collections: this._readCollections(values['Collections']),
+            subjects: this._getSubjects()
+        })
+    }
+
+}
+
+export class DraftReader extends DocumentPageReader {
+
+    protected _parse(): DocumentPage {
+        const values: Record<string, string> = this._readQueries()
+        return new DocumentPage({
+            symbol: values['Symbol'],
+            title: values['Title'],
+            textLinks: this._getTextLinks(values['Access']),
+            date: this._getDate(values['Date']),
+            resolutionCode: this._readCodeUrl(values['Resolution / Decision']),
+            committeeReportCode: this._readCodeUrl(values['Committee report']),
+            authors: this._getAuthors(values['Authors']),
+            agendas: this._getAgendas(values['Agenda information']),
+            description: values['Description'],
+            collections: this._readCollections(values['Collections']),
+            subjects: this._getSubjects()
+        })
+    }
+
+}
+
+export class MeetingRecordReader extends DocumentPageReader {
+
+    protected _parse(): DocumentPage {
+        const values: Record<string, string> = this._readQueries()
+        return new DocumentPage({
+            symbol: values['Symbol'],
+            title: values['Title'],
+            textLinks: this._getTextLinks(values['Access']),
+            date: this._getDate(values['Action note']),
+            agendas: this._getAgendas(values['Agenda information']),
+            description: values['Description'],
+            collections: this._readCollections(values['Collections']),
+            subjects: this._getSubjects()
+        })
+    }
+
+}
+
+export class CommitteeReportReader extends DocumentPageReader {
+    
+    protected _parse(): DocumentPage {
+        const values: Record<string, string> = this._readQueries()
+        return new DocumentPage({
+            symbol: values['Symbol'],
+            title: values['Title'],
+            textLinks: this._getTextLinks(values['Access']),
+            date: this._getDate(values['Date']),
+            authors: this._getAuthors(values['Authors']),
+            agendas: this._getAgendas(values['Agenda information']),
+            description: values['Description'],
+            collections: this._readCollections(values['Collections']),
+            subjects: this._getSubjects()
+        })
+    }
+
 }
 
 function report(msg: string) {
     console.log(msg)
 }
 
-export async function read_pages(years: number[], batch: (result: {resolutions: ResolutionDetailsPage[], drafts: DraftResolutionPage[], year: number}) => Promise<void>): Promise<void> {
-    const resolutions: ResolutionDetailsPage[] = []
-    const drafts: DraftResolutionPage[] = []
+export async function read_pages(years: number[], batch: (result: {resolutions: ResolutionPage[], year: number}) => Promise<void>): Promise<void> {
+    const resolutions: ResolutionPage[] = []
     const concurrent = 6
     let numberOfPages = 0
     let numberOfRecords = 0
     let currentPage = 1
     let running = 0
     let j = 0
-    let listPage: ResolutionListPage = null
+    let listPage: DocumentListPage = null
     let listFreeze = false
-    let ref_queue: ResolutionReference[]
+    let ref_queue: DocumentReference[]
     let yearIndex = 0
 
     const gatewayPage = await new GatewayReader(new AxiosUrlReader()).fetch()
@@ -593,7 +754,7 @@ export async function read_pages(years: number[], batch: (result: {resolutions: 
             if(!listFreeze && numberOfPages) {
                 listFreeze = true
                 if(currentPage == numberOfPages) {
-                    batch({drafts: drafts, resolutions: resolutions, year: years[yearIndex]})
+                    batch({resolutions: resolutions, year: years[yearIndex]})
                     if(yearIndex < years.length - 1) {
                         yearIndex++
                         currentPage = 1
@@ -606,9 +767,9 @@ export async function read_pages(years: number[], batch: (result: {resolutions: 
                 }
                 listFreeze = false
             }
-            listPage = await new ResolutionListPageReader(currentPage, years[yearIndex], new AxiosUrlReader()).fetch()
+            listPage = await new DocumentListPageReader(currentPage, years[yearIndex], new AxiosUrlReader()).fetch()
             numberOfRecords = listPage.numberOfRecords
-            numberOfPages = ResolutionListPageReader.numberToPage(numberOfRecords)
+            numberOfPages = DocumentListPageReader.numberToPage(numberOfRecords)
             ref_queue = Array.from(listPage.resolutions)
             report(`LIST: ${years[yearIndex]}: ${currentPage} <${numberOfPages}/${numberOfRecords}>`)
             j = 0
@@ -619,20 +780,18 @@ export async function read_pages(years: number[], batch: (result: {resolutions: 
         })
     }
 
-    const process_details = function(reference: ResolutionReference) {
+    const process_details = function(reference: DocumentReference) {
         return new Promise<void>(async (resolve) => {
             running++
-            const details = await new ResolutionDetailsPageReader(reference, new CachedAxiosUrlReader())
+            const votingData = await new VotingDataReader(reference, new CachedAxiosUrlReader())
                 .fetch()
 
-            resolutions.push(details)
-
             report(`reading details: ${reference.resolutionCode} [${resolutions.length}]`)
-            if(details.draftResolutionUrl != null) {
-                const draft = await new DraftResolutionPageReader(details.draftResolutionUrl, new CachedAxiosUrlReader())
-                    .fetch()
-                drafts.push(draft)
-            }
+            const resolutionReference = new DocumentReference(null, null, votingData.resolutionCode.code, votingData.resolutionCode.url || votingData.draftResolutionCode.url)
+            const resolutionOrDraft = await new ResolutionReader(
+                resolutionReference, new CachedAxiosUrlReader())
+                                        .fetch()
+            resolutions.push(new ResolutionPage(votingData, resolutionOrDraft))
 
             running--
             if(running < concurrent) {

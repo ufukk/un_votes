@@ -1,7 +1,13 @@
 import "reflect-metadata"
-import { Entity, PrimaryGeneratedColumn, Column, JoinTable, OneToMany, DataSource, Repository, Unique, ManyToOne, ManyToMany, In, OneToOne, JoinColumn } from "typeorm"
+import { Entity, PrimaryGeneratedColumn, Column, JoinTable, OneToMany, DataSource, Repository, Unique, ManyToOne, ManyToMany, In, OneToOne, JoinColumn, PrimaryColumn } from "typeorm"
 
 export enum ResolutionType {
+    Resolution,
+    MeetingRecord,
+    Draft
+}
+
+export enum VotingType {
     GeneralCouncil = 1,
     SecurityCouncil = 2
 }
@@ -105,90 +111,69 @@ export class Subject {
     subjectName: string
 }
 
-@Entity()
-export class DraftResolution {
-    
-    @PrimaryGeneratedColumn()
-    draftResolutionId: number
 
-    @Column({unique: true})
+@Entity()
+export class Resolution {
+
+    @PrimaryColumn()
     symbol: string
 
-    @Column({})
+    @Column()
     title: string
 
+    @Column()
+    votingType: VotingType
+
+    @Column()
+    resolutionStatus: ResolutionStatus
+
     @Column({nullable: true})
-    access: string
+    alternativeTitles: string
+    
+    @OneToOne(() => Resolution, {nullable: true})
+    meetingRecord: Resolution
+    
+    @OneToOne(() => Resolution, {nullable: true})
+    draftResolution: string
+    
+    @OneToOne(() => Resolution, {nullable: true})
+    committeeReport: string
+
+    @Column({nullable: true})
+    note: string
+    
+    @Column({nullable: true})
+    voteSummary: string
 
     @Column({nullable: true})
     resolutionOrDecision: string
-
-    @ManyToMany(() => Author, {eager: true})
-    @JoinTable()
-    authors: Author[]
-
+        
     @Column({nullable: true})
     agendaInformation: string
-
-    @Column({})
+    
+    @Column()
     date: Date
+
+    @Column()
+    detailsUrl: string
 
     @Column({nullable: true})
     description: string
 
     @Column({nullable: true})
     notes: string
-
-    @Column({unique: true})
-    detailsUrl: string
+    
+    @OneToMany(() => DocumentUrl, (text) => text.resolution, {eager: true, cascade: true})
+    @JoinTable()
+    documentUrls: DocumentUrl[]
 
     @ManyToMany(() => Subject, {eager: true})
     @JoinTable()
     subjects: Subject[]
 
-    @OneToMany(() => Resolution, (res) => res.draftResolution)
-    resolutions: Resolution[]
-}
-
-
-@Entity()
-export class Resolution {
-
-    @PrimaryGeneratedColumn()
-    resolutionId: number
-
-    @Column()
-    resolutionType: ResolutionType
-    
-    @Column()
-    resolutionStatus: ResolutionStatus
-    
-    @ManyToOne(() => DraftResolution, (draft) => draft.resolutions, {eager: true})
-    draftResolution: DraftResolution
-
-    @Column()
-    title: string
-    
-    @Column({unique: true})
-    resolutionCode: string
-
-    @Column({nullable: true})
-    meetingRecordCode: string
-    
-    @Column({nullable: true})
-    draftResolutionCode: string
-    
-    @Column({nullable: true})
-    note: string
-    
-    @Column({nullable: true})
-    voteSummary: string
-    
-    @Column()
-    voteDate: Date
-    
-    @Column({unique: true})
-    detailsUrl: string
+    @ManyToMany(() => Subject, {eager: true})
+    @JoinTable()
+    authors: Author[]
 
     @OneToMany(() => ResolutionVote, (vote) => vote.resolution, {eager: true, cascade: true})
     votes: ResolutionVote[]
@@ -196,6 +181,22 @@ export class Resolution {
     @ManyToMany(() => Agenda, {eager: true})
     @JoinTable()
     agendas: Agenda[]
+}
+
+@Entity()
+export class DocumentUrl {
+
+    @PrimaryGeneratedColumn()
+    documentId: number
+
+    @Column()
+    language: string
+
+    @Column()
+    url: string
+
+    @ManyToOne(() => Resolution, (doc) => doc.documentUrls)
+    resolution: Resolution
 }
 
 
@@ -219,7 +220,7 @@ export class ResolutionVote {
 export const defaultDataSource = new DataSource({
     type: 'sqlite',
     database: 'storage/votes.db',
-    entities: [Subject, DraftResolution, Resolution, Author, Country, Agenda, ResolutionVote, SlugAlias, ReadCursor]
+    entities: [Subject, Resolution, DocumentUrl, Author, Country, Agenda, ResolutionVote, SlugAlias, ReadCursor]
 })
 
 class BaseRepository<T> extends Repository<T> {
@@ -234,8 +235,8 @@ export class ResolutionRepository extends BaseRepository<Resolution> {
         return new ResolutionRepository(Resolution, dataSource.createEntityManager())
     }
 
-    async votesForResolution(resolutionId: number): Promise<Map<string, ResolutionVote>> {
-        let votes: ResolutionVote[] = (await this.findOneBy({resolutionId: resolutionId})).votes
+    async votesForResolution(symbol: string): Promise<Map<string, ResolutionVote>> {
+        let votes: ResolutionVote[] = (await this.findOneBy({symbol: symbol})).votes
         let vote_map = new Map<string, ResolutionVote>()
         for(let vote of votes) {
             vote_map[vote.country.name] = vote.vote
@@ -243,25 +244,25 @@ export class ResolutionRepository extends BaseRepository<Resolution> {
         return vote_map
     }
 
-    async resolutionsByYear(year): Promise<Resolution[]> {
+    async resolutionsByYear(year: number, resolutionType: ResolutionType=ResolutionType.Resolution): Promise<Resolution[]> {
         let startDate = new Date(year, 1, 1)
         let endDate = new Date(year + 1, 1, 1)
         let query = this.createQueryBuilder('resolution')
-        .where('voteDate >= :startDate AND voteDate < :endDate', {startDate, endDate})
+        .where('voteDate >= :startDate AND voteDate < :endDate AND resolutionType = :resolutionType', {startDate, endDate, resolutionType})
         .orderBy('voteDate', 'ASC')
         return query.getMany()
     }
 
-    async resolutionsByAgenda(agenda: number): Promise<Resolution[]> {
+    async resolutionsByAgenda(agenda: number, resolutionType: ResolutionType=ResolutionType.Resolution): Promise<Resolution[]> {
         return this.createQueryBuilder('resolution')
         .leftJoinAndSelect('resolution.agendas', 'agenda')
-        .where('agenda_id == :agenda_id', { agenda })
+        .where('agenda_id == :agenda_id AND AND documentType = :documentType', { agenda, resolutionType })
         .orderBy('voteDate', 'ASC')
         .getMany()
     }
 
-    async doesResolutionCodeExist(code: string): Promise<boolean> {
-        return (await this.countBy({resolutionCode: code})) > 0
+    async doesResolutionCodeExist(symbol: string): Promise<boolean> {
+        return (await this.countBy({symbol: symbol})) > 0
     }
 }
 
@@ -317,12 +318,6 @@ export class SubjectRepository extends BaseRepository<Subject> {
         return await this.findOneBy({subjectName: name})
     }
 
-}
-
-export class DraftResolutionRepository extends BaseRepository<DraftResolution> {
-    static createInstance(dataSource: DataSource): DraftResolutionRepository {
-        return new DraftResolutionRepository(DraftResolution, dataSource.createEntityManager())
-    }
 }
 
 export class SlugAliasRepository extends BaseRepository<SlugAlias> {
