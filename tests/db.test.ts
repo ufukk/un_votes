@@ -164,6 +164,75 @@ describe('db tests', () => {
         expect(found.symbol).toBe('A/R#1')
         expect(found.documentUrls.length).toBe(2)
         expect(found.votes.length).toBe(3)
+        expect(found.authors.length).toBe(2)
+    })
+
+    test('ImporterTask', async () => {
+        await withCountries(newCountry('China', 'CN', 11), newCountry('Cuba', 'CU', 13))
+        const firstResolution = ResolutionPage.new({
+            title: 'Resolution #1',
+            symbol: 'A/R/#1',
+            date: new Date('2023-0-1'),
+            collections: ['Resolutions'],
+            subjects: ['Middle East', 'Conflicts'],
+            votes: new Map<string, string>([ ['Brazil', 'Y'], ['Argentina', 'Y'], ['Ghana', 'N'] ]),
+            voteSummary: 'Accepted with 3 votes',
+            authors: ['China', 'Cuba'],
+            detailsUrl: 'details1.url',
+            textLinks: {'Arabic': 'arabic1.pdf', 'Spanish': 'spanish1.pdf'}             
+        })
+        const secondResolution = ResolutionPage.new({
+            title: 'Resolution #2',
+            symbol: 'S/R/#2',
+            date: new Date('2021-3-3'),
+            collections: ['Resolutions'],
+            subjects: ['Environment', 'Climate Change'],
+            votes: new Map<string, string>([ ['Germany', 'N'], ['France', 'N'], ['Greece', 'Y'], ['Chile', 'A'] ]),
+            voteSummary: 'Accepted with 4 votes',
+            authors: ['Group of 77'],
+            detailsUrl: 'details2.url',
+            textLinks: {'Arabic': 'arabic2.pdf', 'Spanish': 'spanish2.pdf', 'French': 'french2.pdf'}             
+        })
+        const thirdResolution = ResolutionPage.new({
+            title: 'Resolution #3',
+            symbol: 'A/R/#3',
+            date: new Date('2020-5-5'),
+            collections: ['Resolutions'],
+            subjects: ['Peace', 'Trade'],
+            votes: new Map<string, string>([ ['Thailand', 'A'], ['Vietnam', 'N'], ['Indonesia', 'Y'], ['Phillipines', 'N'], ['Mexico', 'A'] ]),
+            voteSummary: 'Accepted with 5 votes',
+            authors: ['Group of 77', 'Mexico'],
+            detailsUrl: 'details3.url',
+            textLinks: {'Arabic': 'arabic3.pdf', 'Spanish': 'spanish3.pdf', 'French': 'french3.pdf'}             
+        })
+
+        const cursor = new MockCursorKeeper()
+        const task = new ImportTask(testDataSource, cursor)
+        const result = await task.importCollection({resolutions: [firstResolution, secondResolution, thirdResolution]})
+        expect(result.successes.length).toBe(3)
+
+        const repo = new ResolutionRepository(Resolution, testDataSource.createEntityManager())
+        const firstFound = await repo.findOneBy({symbol: 'A/R/#1'})
+
+        expect(firstFound.symbol).toBe('A/R/#1')
+        expect(firstFound.votes.length).toBe(3)
+        const voteMap = repo.voteMap(firstFound)
+        expect(voteMap.size).toBe(3)
+        expect(voteMap.get('Brazil')).toBe(Vote.Yes)
+        expect(voteMap.get('Argentina')).toBe(Vote.Yes)
+        expect(voteMap.get('Ghana')).toBe(Vote.No)
+        expect(firstFound.documentUrls[0].language).toBe('Arabic')
+        expect(firstFound.documentUrls[1].language).toBe('Spanish')
+        expect(firstFound.subjects[0].subjectName).toBe('Middle East')
+        expect(firstFound.subjects[1].subjectName).toBe('Conflicts')
+        expect(firstFound.authors.length).toBe(2)
+        expect(firstFound.authors[0].country.name).toBe('China')
+
+        const secondFound = await repo.findOneBy({symbol: 'S/R/#2'})
+        expect(secondFound.symbol).toBe('S/R/#2')
+
+        const thirdFound = await repo.findOneBy({symbol: 'A/R/#3'})
+        expect(thirdFound.symbol).toBe('A/R/#3')
     })
 
 

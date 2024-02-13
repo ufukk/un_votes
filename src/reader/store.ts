@@ -120,7 +120,7 @@ export class AuthorTransformer extends Transformer<string, Author> {
     }
     
     async exists(item: Author): Promise<boolean> {
-        return item.author_id == undefined
+        return (await this.repository.countBy({authorName: item.authorName})) > 0
     }
 
 }
@@ -261,7 +261,6 @@ export class ResolutionTransformer extends Transformer<ResolutionPage, Resolutio
         }
         return models
     }
-
 
     async transform(item: ResolutionPage): Promise<Resolution> {
         let resolution = new Resolution()

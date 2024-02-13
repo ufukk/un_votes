@@ -171,7 +171,7 @@ export class Resolution {
     @JoinTable()
     subjects: Subject[]
 
-    @ManyToMany(() => Subject, {eager: true})
+    @ManyToMany(() => Author, {eager: true})
     @JoinTable()
     authors: Author[]
 
@@ -210,7 +210,7 @@ export class ResolutionVote {
     @ManyToOne(() => Resolution, (resolution) => resolution.votes)
     resolution: Resolution
 
-    @ManyToOne((type) => Country)
+    @ManyToOne((type) => Country, {eager: true})
     country: Country
 
     @Column()
@@ -235,11 +235,10 @@ export class ResolutionRepository extends BaseRepository<Resolution> {
         return new ResolutionRepository(Resolution, dataSource.createEntityManager())
     }
 
-    async votesForResolution(symbol: string): Promise<Map<string, ResolutionVote>> {
-        let votes: ResolutionVote[] = (await this.findOneBy({symbol: symbol})).votes
-        let vote_map = new Map<string, ResolutionVote>()
-        for(let vote of votes) {
-            vote_map[vote.country.name] = vote.vote
+    voteMap(resolution: Resolution): Map<string, Vote> {
+        let vote_map = new Map<string, Vote>()
+        for(let vote of resolution.votes) {
+            vote_map.set(vote.country.name, vote.vote)
         }
         return vote_map
     }

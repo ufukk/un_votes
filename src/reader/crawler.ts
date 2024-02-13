@@ -110,6 +110,55 @@ export class ResolutionPage implements IDocument {
     readonly subjects?: string[]
     readonly textLinks?: TextLinks
 
+    static new(
+        {
+            symbol, 
+            title,
+            alternativeTitles = [],
+            agendas = [],
+            resolutionCode = null,
+            meetingRecordCode = null,
+            draftResolutionCode = null,
+            committeeReportCode = null,
+            callNumber = null,
+            voteSummary = null,
+            detailsUrl = null,
+            votes = null,
+            collections = [],
+            resolutionOrDecision = null,
+            authors = [],
+            agendaInformation = null,
+            date,
+            description = null,
+            notes = null,
+            subjects = [],
+            textLinks = null
+        }: IDocument
+    ): ResolutionPage {
+        return new ResolutionPage(new DocumentPage({title: null, date: new Date(), collections: [], votes: votes, voteSummary: voteSummary}), 
+                                new DocumentPage({
+                                    symbol: symbol,
+                                    title: title,
+                                    alternativeTitles: alternativeTitles,
+                                    agendas: agendas,
+                                    agendaInformation: agendaInformation,
+                                    resolutionCode: resolutionCode,
+                                    meetingRecordCode: meetingRecordCode,
+                                    draftResolutionCode: draftResolutionCode,
+                                    committeeReportCode: committeeReportCode,
+                                    callNumber: callNumber,
+                                    detailsUrl: detailsUrl,
+                                    resolutionOrDecision: resolutionOrDecision,
+                                    authors: authors,
+                                    description: description,
+                                    notes: notes,
+                                    subjects: subjects,
+                                    textLinks: textLinks,
+                                    collections: collections,
+                                    date: date
+                }))  
+    } 
+
     constructor(votingData: DocumentPage, resolutionOrDraft: DocumentPage=null) {
         this.voteSummary = votingData.voteSummary
         this.votes = votingData.votes

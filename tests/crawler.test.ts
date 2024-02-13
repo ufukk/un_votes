@@ -167,6 +167,12 @@ describe('unvotes tests', () => {
         expect(resolution.subjects).toStrictEqual(['Middle East', 'Conflicts'])
         expect(resolution.textLinks).toStrictEqual({"Arabic": "arabic.pdf", "Spanish": "spanish.pdf"})
         expect(resolution.detailsUrl).toBe('details.url')
+        const res = ResolutionPage.new({title: 'Resolution A#14', symbol: 'R#14', date: new Date('2021-2-2'), detailsUrl: 'details.url', collections: ['Resolutions'], subjects: ['Middle East', 'Conflicts'], textLinks: {'Arabic': 'arabic.pdf', 'Spanish': 'spanish.pdf'}, votes: new Map<string, string>([ ['Brazil', 'Y'], ['Argentina', 'Y'], ['Nigeria', 'N']]), voteSummary: '3 Votes'})
+        expect(res.symbol).toBe('R#14')
+        expect(res.title).toBe('Resolution A#14')
+        expect(res.votes.size).toBe(3)
+        expect(res.votes.get('Brazil')).toBe('Y')
+        expect(res.voteSummary).toBe('3 Votes')
     })
 
 

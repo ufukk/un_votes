@@ -1,7 +1,7 @@
 import { DataSource } from 'typeorm'
-import { Country, Resolution, Agenda, CountryRepository, AgendaRepository, ResolutionRepository, ReadCursorRepository, DraftResolution, Subject, ReadCursor } from './models'
-import { DraftResolutionTransformer, ResolutionDetailsPageTransformer } from './store'
-import { DraftResolutionPage, ResolutionDetailsPage } from './crawler'
+import { Country, Resolution, Agenda, CountryRepository, AgendaRepository, ResolutionRepository, ReadCursorRepository, Subject, ReadCursor } from './models'
+import { ResolutionTransformer } from './store'
+import { ResolutionPage } from './crawler'
 import { report } from '../utils'
 
 export interface CursorKeeper {
@@ -102,58 +102,40 @@ export class TaskResultWrapper extends BatchTaskResult {
     }
 }
 
-type ImportableCollection = {resolutions: ResolutionDetailsPage[], drafts: DraftResolutionPage[]}
+type ImportableCollection = {resolutions: ResolutionPage[]}
 
 export class ImportTask {
 
     readonly taskResult: TaskResultWrapper
-    readonly draftTransformer: DraftResolutionTransformer
-    readonly resolutionTransformer: ResolutionDetailsPageTransformer
+    readonly resolutionTransformer: ResolutionTransformer
 
     constructor(public readonly dataSource: DataSource, 
                 public readonly cursorKeeper: CursorKeeper) {
         this.taskResult = new TaskResultWrapper()
-        this.draftTransformer = new DraftResolutionTransformer(this.dataSource)
-        this.resolutionTransformer = new ResolutionDetailsPageTransformer(this.dataSource)
+        this.resolutionTransformer = new ResolutionTransformer(this.dataSource)
     }
 
-    protected async _importDrafts(items: DraftResolutionPage[]): Promise<TaskResult> {
-        const taskResult = new BatchTaskResult()
-        for(const draft of items) {
-            const entity = await this.draftTransformer.transform(draft)
-            if((await this.draftTransformer.exists(entity))) {
-                taskResult.skipped.push({type: 'draft', id: entity.symbol})
-                continue
-            }
-            const saved = await this.draftTransformer.save(entity)
-            taskResult.successes.push({type: 'draft', id: saved.draftResolutionId})
-        }
-        return taskResult
-    }
-
-    protected async _importResolutions(items: ResolutionDetailsPage[]): Promise<TaskResult> {
+    protected async _importResolutions(items: ResolutionPage[]): Promise<TaskResult> {
         const taskResult = new BatchTaskResult()
         let earliest: Date = null
         for(const resolution of items) {
             const entity = await this.resolutionTransformer.transform(resolution)
             if((await this.resolutionTransformer.exists(entity))) {
-                taskResult.skipped.push({type: 'resolution', id: entity.resolutionCode})
+                taskResult.skipped.push({type: 'resolution', id: entity.symbol})
                 continue
             }
             const saved = await this.resolutionTransformer.save(entity)
-            if(entity.voteDate < earliest || earliest == null) {
-                earliest = entity.voteDate
+            if(entity.date < earliest || earliest == null) {
+                earliest = entity.date
             }
-            taskResult.successes.push({type: 'resolution', id: saved.resolutionCode})
+            taskResult.successes.push({type: 'resolution', id: saved.symbol})
         }
-        report(earliest, 'CURSOR')
         await this.cursorKeeper.updateDate(earliest)
         return taskResult
     }
 
     async importCollection(collection: ImportableCollection): Promise<TaskResult> {
         const taskResult = new BatchTaskResult()
-        taskResult.fold(await this._importDrafts(collection.drafts))
         taskResult.fold(await this._importResolutions(collection.resolutions))
         this.taskResult.fold(taskResult)
         return taskResult
