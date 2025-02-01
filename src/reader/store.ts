@@ -16,7 +16,7 @@ export class TransformationError extends Error {
 
 abstract class Transformer<K, T extends Transformable> {
 
-    protected repository: Repository<T>
+    protected repository: Repository<T> = null
 
 
     constructor(protected readonly dataSource: DataSource) {
@@ -235,7 +235,10 @@ export class ResolutionTransformer extends Transformer<ResolutionPage, Resolutio
         if(item.voteSummary && (item.voteSummary.match(/Adopted/) || item.voteSummary.match(/Voting Summary/))) {
             return ResolutionStatus.VotedAndAdopted
         }
-        throw new TransformationError(item, `Resolution status could not be determined <${item.resolutionCode}> | <${item.notes}>`)
+        if(item.title.match(/adopted by/)) {
+            return ResolutionStatus.AdoptedWithoutVote
+        }
+        throw new TransformationError(item, `Resolution status could not be determined <${item.symbol}> | <${item.notes}>`)
     }
 
     private async __subjects(item: ResolutionPage): Promise<Subject[]> {
@@ -267,7 +270,7 @@ export class ResolutionTransformer extends Transformer<ResolutionPage, Resolutio
         resolution.symbol = item.symbol
         resolution.votingType = this.findResolutionType(item)
         resolution.resolutionStatus = this.findResolutionStatus(item)
-        resolution.note = item.notes
+        resolution.notes = item.notes
         resolution.title = item.title
         resolution.date = item.date
         resolution.detailsUrl = item.detailsUrl

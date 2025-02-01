@@ -1,16 +1,18 @@
 import { DataSource } from 'typeorm'
 import { Country, Resolution, Agenda, CountryRepository, AgendaRepository, ResolutionRepository, ReadCursorRepository, Subject, ReadCursor } from './models'
-import { ResolutionTransformer } from './store'
+import { CountryNameTransformer, ResolutionTransformer } from './store'
 import { ResolutionPage } from './crawler'
 import { report } from '../utils'
+import { parse } from 'csv-parse';
+import fs from 'fs'
 
 export interface CursorKeeper {
 
     updateDate(lastDate: Date): Promise<void>
 
-    updatePage(lastPage: number): Promise<void>
+    updateYear(year: number): Promise<void>
 
-    get(): Promise<{lastDate: Date, lastPage: number}>
+    get(): Promise<{date: Date, year: number}>
 
 }
 
@@ -49,17 +51,17 @@ export class DBCursorKeeper implements CursorKeeper {
         }
     }
 
-    async updatePage(lastPage: number): Promise<void> {
+    async updateYear(year: number): Promise<void> {
         const cursor = await this._getCursor()
-        if(lastPage > cursor.lastPage || !cursor.lastPage) {
-            cursor.lastPage = lastPage
+        if(year < cursor.year || !cursor.year) {
+            cursor.year = year
             await this.cursorRepo.save(cursor)
         }
     }
 
-    async get(): Promise<{ lastDate: Date; lastPage: number }> {
+    async get(): Promise<{ date: Date; year: number }> {
         const cursor = await this._getCursor()
-        return {lastDate: cursor.lastDate, lastPage: cursor.lastPage}
+        return {date: cursor.lastDate, year: cursor.year}
     }
     
 }
@@ -142,3 +144,28 @@ export class ImportTask {
     }
 }
 
+export class CountryImportTask {
+
+    constructor(public readonly dataSource: DataSource) {}
+
+    async importCountries(filePath: string): Promise<number> {
+        const transformer = new CountryNameTransformer(this.dataSource)
+        const parser = fs.createReadStream(filePath)
+        .pipe(parse({comment: '#', delimiter: '\t', relaxColumnCount: true}))
+        let total = 0
+        for await (const row of parser) {
+            const country = await transformer.transform(row[4])
+            country.alpha2 = row[0].trim()
+            country.fipscode = row[2]
+            country.iso3 = row[1].trim()
+            const doesExist = await transformer.exists(country)
+            if(!doesExist) {
+                transformer.save(country)
+            }
+            report([country.name, country.un_name, country.alpha2, country.fipscode], 'ROW')
+            total++
+        }
+        return total
+    }
+
+}
