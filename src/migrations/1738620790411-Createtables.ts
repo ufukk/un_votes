@@ -1,0 +1,120 @@
+import type { MigrationInterface, QueryRunner } from "typeorm";
+
+export class Createtables1738620790411 implements MigrationInterface {
+    name = 'Createtables1738620790411'
+
+    public async up(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`CREATE TABLE "read_cursor" ("cursorId" varchar(50) PRIMARY KEY NOT NULL, "lastDate" date, "year" integer)`);
+        await queryRunner.query(`CREATE TABLE "slug_alias" ("slugId" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "slug" varchar(50) NOT NULL, "alias" varchar(50) NOT NULL, CONSTRAINT "UQ_b7d57ad215e5f02e40580ff1c10" UNIQUE ("slug", "alias"))`);
+        await queryRunner.query(`CREATE TABLE "country" ("countryId" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar NOT NULL, "un_name" varchar NOT NULL, "slug" varchar NOT NULL, "alpha2" varchar, "iso3" varchar, "fipscode" integer, CONSTRAINT "UQ_2c5aa339240c0c3ae97fcc9dc4c" UNIQUE ("name"), CONSTRAINT "UQ_d1c850725802605dcfc6b0a7693" UNIQUE ("un_name"), CONSTRAINT "UQ_4cd2b9410fe9cb70466134c2f9a" UNIQUE ("slug"), CONSTRAINT "UQ_05bb99dff5ece9e1234a48bf0da" UNIQUE ("alpha2"), CONSTRAINT "UQ_8df5b1a0131e8e155381547aa5b" UNIQUE ("iso3"), CONSTRAINT "UQ_001c42aa6ab3c837c35d44972bb" UNIQUE ("fipscode"))`);
+        await queryRunner.query(`CREATE TABLE "author" ("authorId" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "authorName" varchar NOT NULL, "countryCountryId" integer, CONSTRAINT "UQ_4d719c9e62eeba82e1a745b9cdd" UNIQUE ("authorName"), CONSTRAINT "REL_53d908fee112510f64f3b91e4d" UNIQUE ("countryCountryId"))`);
+        await queryRunner.query(`CREATE TABLE "agenda" ("agendaId" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar NOT NULL, "un_name" varchar NOT NULL, CONSTRAINT "UQ_3ca65970336d8ac2bb7fea64df4" UNIQUE ("name"), CONSTRAINT "UQ_de30da6b17639298e90134cf99b" UNIQUE ("un_name"))`);
+        await queryRunner.query(`CREATE TABLE "subject" ("subjectId" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "subjectName" varchar NOT NULL, CONSTRAINT "UQ_0481fde67dc08515c21fbd307e2" UNIQUE ("subjectName"))`);
+        await queryRunner.query(`CREATE TABLE "resolution" ("resolutionId" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "resolutionSymbol" varchar NOT NULL, "title" varchar NOT NULL, "votingType" varchar CHECK( "votingType" IN ('1','2') ) NOT NULL, "resolutionStatus" varchar CHECK( "resolutionStatus" IN ('1','2','3') ) NOT NULL, "alternativeTitles" varchar, "voteSummary" varchar, "resolutionOrDecision" varchar, "agendaInformation" varchar, "date" date NOT NULL, "year" smallint NOT NULL, "detailsUrl" varchar NOT NULL, "description" varchar, "notes" varchar, CONSTRAINT "UQ_e588ec2f96918b9ee3df596dacf" UNIQUE ("resolutionSymbol"))`);
+        await queryRunner.query(`CREATE TABLE "document_url" ("documentId" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "language" varchar NOT NULL, "url" varchar NOT NULL, "resolutionResolutionId" integer)`);
+        await queryRunner.query(`CREATE TABLE "resolution_vote" ("voteId" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "vote" varchar CHECK( "vote" IN ('1','2','3','4') ) NOT NULL, "resolutionResolutionId" integer, "countryCountryId" integer, CONSTRAINT "UQ_454dc83cf154b410361d83fe89d" UNIQUE ("resolutionResolutionId", "countryCountryId"))`);
+        await queryRunner.query(`CREATE TABLE "resolution_subjects_subject" ("resolutionResolutionId" integer NOT NULL, "subjectSubjectId" integer NOT NULL, PRIMARY KEY ("resolutionResolutionId", "subjectSubjectId"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_833bdd59c8fdaec6a0e2d162aa" ON "resolution_subjects_subject" ("resolutionResolutionId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_d936bc8cf66eb2449b7e2a0c5e" ON "resolution_subjects_subject" ("subjectSubjectId") `);
+        await queryRunner.query(`CREATE TABLE "resolution_authors_author" ("resolutionResolutionId" integer NOT NULL, "authorAuthorId" integer NOT NULL, PRIMARY KEY ("resolutionResolutionId", "authorAuthorId"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_bd29f48486b216f3ceb36258eb" ON "resolution_authors_author" ("resolutionResolutionId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_79c19f70c8fd6e6b33d850fb7b" ON "resolution_authors_author" ("authorAuthorId") `);
+        await queryRunner.query(`CREATE TABLE "resolution_agendas_agenda" ("resolutionResolutionId" integer NOT NULL, "agendaAgendaId" integer NOT NULL, PRIMARY KEY ("resolutionResolutionId", "agendaAgendaId"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_121af81e037580e7860969a9b0" ON "resolution_agendas_agenda" ("resolutionResolutionId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_8c9813bcabbd49e4c15679c29c" ON "resolution_agendas_agenda" ("agendaAgendaId") `);
+        await queryRunner.query(`CREATE TABLE "temporary_author" ("authorId" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "authorName" varchar NOT NULL, "countryCountryId" integer, CONSTRAINT "UQ_4d719c9e62eeba82e1a745b9cdd" UNIQUE ("authorName"), CONSTRAINT "REL_53d908fee112510f64f3b91e4d" UNIQUE ("countryCountryId"), CONSTRAINT "FK_53d908fee112510f64f3b91e4d8" FOREIGN KEY ("countryCountryId") REFERENCES "country" ("countryId") ON DELETE NO ACTION ON UPDATE NO ACTION)`);
+        await queryRunner.query(`INSERT INTO "temporary_author"("authorId", "authorName", "countryCountryId") SELECT "authorId", "authorName", "countryCountryId" FROM "author"`);
+        await queryRunner.query(`DROP TABLE "author"`);
+        await queryRunner.query(`ALTER TABLE "temporary_author" RENAME TO "author"`);
+        await queryRunner.query(`CREATE TABLE "temporary_document_url" ("documentId" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "language" varchar NOT NULL, "url" varchar NOT NULL, "resolutionResolutionId" integer, CONSTRAINT "FK_4aa0cbcdf08c96afcc6ae0d39d4" FOREIGN KEY ("resolutionResolutionId") REFERENCES "resolution" ("resolutionId") ON DELETE NO ACTION ON UPDATE NO ACTION)`);
+        await queryRunner.query(`INSERT INTO "temporary_document_url"("documentId", "language", "url", "resolutionResolutionId") SELECT "documentId", "language", "url", "resolutionResolutionId" FROM "document_url"`);
+        await queryRunner.query(`DROP TABLE "document_url"`);
+        await queryRunner.query(`ALTER TABLE "temporary_document_url" RENAME TO "document_url"`);
+        await queryRunner.query(`CREATE TABLE "temporary_resolution_vote" ("voteId" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "vote" varchar CHECK( "vote" IN ('1','2','3','4') ) NOT NULL, "resolutionResolutionId" integer, "countryCountryId" integer, CONSTRAINT "UQ_454dc83cf154b410361d83fe89d" UNIQUE ("resolutionResolutionId", "countryCountryId"), CONSTRAINT "FK_6b304b4f20ea980e42e51bf07e3" FOREIGN KEY ("resolutionResolutionId") REFERENCES "resolution" ("resolutionId") ON DELETE NO ACTION ON UPDATE NO ACTION, CONSTRAINT "FK_01e0919bd2f46e001701f99a07d" FOREIGN KEY ("countryCountryId") REFERENCES "country" ("countryId") ON DELETE NO ACTION ON UPDATE NO ACTION)`);
+        await queryRunner.query(`INSERT INTO "temporary_resolution_vote"("voteId", "vote", "resolutionResolutionId", "countryCountryId") SELECT "voteId", "vote", "resolutionResolutionId", "countryCountryId" FROM "resolution_vote"`);
+        await queryRunner.query(`DROP TABLE "resolution_vote"`);
+        await queryRunner.query(`ALTER TABLE "temporary_resolution_vote" RENAME TO "resolution_vote"`);
+        await queryRunner.query(`DROP INDEX "IDX_833bdd59c8fdaec6a0e2d162aa"`);
+        await queryRunner.query(`DROP INDEX "IDX_d936bc8cf66eb2449b7e2a0c5e"`);
+        await queryRunner.query(`CREATE TABLE "temporary_resolution_subjects_subject" ("resolutionResolutionId" integer NOT NULL, "subjectSubjectId" integer NOT NULL, CONSTRAINT "FK_833bdd59c8fdaec6a0e2d162aae" FOREIGN KEY ("resolutionResolutionId") REFERENCES "resolution" ("resolutionId") ON DELETE CASCADE ON UPDATE CASCADE, CONSTRAINT "FK_d936bc8cf66eb2449b7e2a0c5ec" FOREIGN KEY ("subjectSubjectId") REFERENCES "subject" ("subjectId") ON DELETE CASCADE ON UPDATE CASCADE, PRIMARY KEY ("resolutionResolutionId", "subjectSubjectId"))`);
+        await queryRunner.query(`INSERT INTO "temporary_resolution_subjects_subject"("resolutionResolutionId", "subjectSubjectId") SELECT "resolutionResolutionId", "subjectSubjectId" FROM "resolution_subjects_subject"`);
+        await queryRunner.query(`DROP TABLE "resolution_subjects_subject"`);
+        await queryRunner.query(`ALTER TABLE "temporary_resolution_subjects_subject" RENAME TO "resolution_subjects_subject"`);
+        await queryRunner.query(`CREATE INDEX "IDX_833bdd59c8fdaec6a0e2d162aa" ON "resolution_subjects_subject" ("resolutionResolutionId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_d936bc8cf66eb2449b7e2a0c5e" ON "resolution_subjects_subject" ("subjectSubjectId") `);
+        await queryRunner.query(`DROP INDEX "IDX_bd29f48486b216f3ceb36258eb"`);
+        await queryRunner.query(`DROP INDEX "IDX_79c19f70c8fd6e6b33d850fb7b"`);
+        await queryRunner.query(`CREATE TABLE "temporary_resolution_authors_author" ("resolutionResolutionId" integer NOT NULL, "authorAuthorId" integer NOT NULL, CONSTRAINT "FK_bd29f48486b216f3ceb36258ebd" FOREIGN KEY ("resolutionResolutionId") REFERENCES "resolution" ("resolutionId") ON DELETE CASCADE ON UPDATE CASCADE, CONSTRAINT "FK_79c19f70c8fd6e6b33d850fb7b9" FOREIGN KEY ("authorAuthorId") REFERENCES "author" ("authorId") ON DELETE CASCADE ON UPDATE CASCADE, PRIMARY KEY ("resolutionResolutionId", "authorAuthorId"))`);
+        await queryRunner.query(`INSERT INTO "temporary_resolution_authors_author"("resolutionResolutionId", "authorAuthorId") SELECT "resolutionResolutionId", "authorAuthorId" FROM "resolution_authors_author"`);
+        await queryRunner.query(`DROP TABLE "resolution_authors_author"`);
+        await queryRunner.query(`ALTER TABLE "temporary_resolution_authors_author" RENAME TO "resolution_authors_author"`);
+        await queryRunner.query(`CREATE INDEX "IDX_bd29f48486b216f3ceb36258eb" ON "resolution_authors_author" ("resolutionResolutionId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_79c19f70c8fd6e6b33d850fb7b" ON "resolution_authors_author" ("authorAuthorId") `);
+        await queryRunner.query(`DROP INDEX "IDX_121af81e037580e7860969a9b0"`);
+        await queryRunner.query(`DROP INDEX "IDX_8c9813bcabbd49e4c15679c29c"`);
+        await queryRunner.query(`CREATE TABLE "temporary_resolution_agendas_agenda" ("resolutionResolutionId" integer NOT NULL, "agendaAgendaId" integer NOT NULL, CONSTRAINT "FK_121af81e037580e7860969a9b03" FOREIGN KEY ("resolutionResolutionId") REFERENCES "resolution" ("resolutionId") ON DELETE CASCADE ON UPDATE CASCADE, CONSTRAINT "FK_8c9813bcabbd49e4c15679c29c9" FOREIGN KEY ("agendaAgendaId") REFERENCES "agenda" ("agendaId") ON DELETE CASCADE ON UPDATE CASCADE, PRIMARY KEY ("resolutionResolutionId", "agendaAgendaId"))`);
+        await queryRunner.query(`INSERT INTO "temporary_resolution_agendas_agenda"("resolutionResolutionId", "agendaAgendaId") SELECT "resolutionResolutionId", "agendaAgendaId" FROM "resolution_agendas_agenda"`);
+        await queryRunner.query(`DROP TABLE "resolution_agendas_agenda"`);
+        await queryRunner.query(`ALTER TABLE "temporary_resolution_agendas_agenda" RENAME TO "resolution_agendas_agenda"`);
+        await queryRunner.query(`CREATE INDEX "IDX_121af81e037580e7860969a9b0" ON "resolution_agendas_agenda" ("resolutionResolutionId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_8c9813bcabbd49e4c15679c29c" ON "resolution_agendas_agenda" ("agendaAgendaId") `);
+    }
+
+    public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`DROP INDEX "IDX_8c9813bcabbd49e4c15679c29c"`);
+        await queryRunner.query(`DROP INDEX "IDX_121af81e037580e7860969a9b0"`);
+        await queryRunner.query(`ALTER TABLE "resolution_agendas_agenda" RENAME TO "temporary_resolution_agendas_agenda"`);
+        await queryRunner.query(`CREATE TABLE "resolution_agendas_agenda" ("resolutionResolutionId" integer NOT NULL, "agendaAgendaId" integer NOT NULL, PRIMARY KEY ("resolutionResolutionId", "agendaAgendaId"))`);
+        await queryRunner.query(`INSERT INTO "resolution_agendas_agenda"("resolutionResolutionId", "agendaAgendaId") SELECT "resolutionResolutionId", "agendaAgendaId" FROM "temporary_resolution_agendas_agenda"`);
+        await queryRunner.query(`DROP TABLE "temporary_resolution_agendas_agenda"`);
+        await queryRunner.query(`CREATE INDEX "IDX_8c9813bcabbd49e4c15679c29c" ON "resolution_agendas_agenda" ("agendaAgendaId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_121af81e037580e7860969a9b0" ON "resolution_agendas_agenda" ("resolutionResolutionId") `);
+        await queryRunner.query(`DROP INDEX "IDX_79c19f70c8fd6e6b33d850fb7b"`);
+        await queryRunner.query(`DROP INDEX "IDX_bd29f48486b216f3ceb36258eb"`);
+        await queryRunner.query(`ALTER TABLE "resolution_authors_author" RENAME TO "temporary_resolution_authors_author"`);
+        await queryRunner.query(`CREATE TABLE "resolution_authors_author" ("resolutionResolutionId" integer NOT NULL, "authorAuthorId" integer NOT NULL, PRIMARY KEY ("resolutionResolutionId", "authorAuthorId"))`);
+        await queryRunner.query(`INSERT INTO "resolution_authors_author"("resolutionResolutionId", "authorAuthorId") SELECT "resolutionResolutionId", "authorAuthorId" FROM "temporary_resolution_authors_author"`);
+        await queryRunner.query(`DROP TABLE "temporary_resolution_authors_author"`);
+        await queryRunner.query(`CREATE INDEX "IDX_79c19f70c8fd6e6b33d850fb7b" ON "resolution_authors_author" ("authorAuthorId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_bd29f48486b216f3ceb36258eb" ON "resolution_authors_author" ("resolutionResolutionId") `);
+        await queryRunner.query(`DROP INDEX "IDX_d936bc8cf66eb2449b7e2a0c5e"`);
+        await queryRunner.query(`DROP INDEX "IDX_833bdd59c8fdaec6a0e2d162aa"`);
+        await queryRunner.query(`ALTER TABLE "resolution_subjects_subject" RENAME TO "temporary_resolution_subjects_subject"`);
+        await queryRunner.query(`CREATE TABLE "resolution_subjects_subject" ("resolutionResolutionId" integer NOT NULL, "subjectSubjectId" integer NOT NULL, PRIMARY KEY ("resolutionResolutionId", "subjectSubjectId"))`);
+        await queryRunner.query(`INSERT INTO "resolution_subjects_subject"("resolutionResolutionId", "subjectSubjectId") SELECT "resolutionResolutionId", "subjectSubjectId" FROM "temporary_resolution_subjects_subject"`);
+        await queryRunner.query(`DROP TABLE "temporary_resolution_subjects_subject"`);
+        await queryRunner.query(`CREATE INDEX "IDX_d936bc8cf66eb2449b7e2a0c5e" ON "resolution_subjects_subject" ("subjectSubjectId") `);
+        await queryRunner.query(`CREATE INDEX "IDX_833bdd59c8fdaec6a0e2d162aa" ON "resolution_subjects_subject" ("resolutionResolutionId") `);
+        await queryRunner.query(`ALTER TABLE "resolution_vote" RENAME TO "temporary_resolution_vote"`);
+        await queryRunner.query(`CREATE TABLE "resolution_vote" ("voteId" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "vote" varchar CHECK( "vote" IN ('1','2','3','4') ) NOT NULL, "resolutionResolutionId" integer, "countryCountryId" integer, CONSTRAINT "UQ_454dc83cf154b410361d83fe89d" UNIQUE ("resolutionResolutionId", "countryCountryId"))`);
+        await queryRunner.query(`INSERT INTO "resolution_vote"("voteId", "vote", "resolutionResolutionId", "countryCountryId") SELECT "voteId", "vote", "resolutionResolutionId", "countryCountryId" FROM "temporary_resolution_vote"`);
+        await queryRunner.query(`DROP TABLE "temporary_resolution_vote"`);
+        await queryRunner.query(`ALTER TABLE "document_url" RENAME TO "temporary_document_url"`);
+        await queryRunner.query(`CREATE TABLE "document_url" ("documentId" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "language" varchar NOT NULL, "url" varchar NOT NULL, "resolutionResolutionId" integer)`);
+        await queryRunner.query(`INSERT INTO "document_url"("documentId", "language", "url", "resolutionResolutionId") SELECT "documentId", "language", "url", "resolutionResolutionId" FROM "temporary_document_url"`);
+        await queryRunner.query(`DROP TABLE "temporary_document_url"`);
+        await queryRunner.query(`ALTER TABLE "author" RENAME TO "temporary_author"`);
+        await queryRunner.query(`CREATE TABLE "author" ("authorId" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "authorName" varchar NOT NULL, "countryCountryId" integer, CONSTRAINT "UQ_4d719c9e62eeba82e1a745b9cdd" UNIQUE ("authorName"), CONSTRAINT "REL_53d908fee112510f64f3b91e4d" UNIQUE ("countryCountryId"))`);
+        await queryRunner.query(`INSERT INTO "author"("authorId", "authorName", "countryCountryId") SELECT "authorId", "authorName", "countryCountryId" FROM "temporary_author"`);
+        await queryRunner.query(`DROP TABLE "temporary_author"`);
+        await queryRunner.query(`DROP INDEX "IDX_8c9813bcabbd49e4c15679c29c"`);
+        await queryRunner.query(`DROP INDEX "IDX_121af81e037580e7860969a9b0"`);
+        await queryRunner.query(`DROP TABLE "resolution_agendas_agenda"`);
+        await queryRunner.query(`DROP INDEX "IDX_79c19f70c8fd6e6b33d850fb7b"`);
+        await queryRunner.query(`DROP INDEX "IDX_bd29f48486b216f3ceb36258eb"`);
+        await queryRunner.query(`DROP TABLE "resolution_authors_author"`);
+        await queryRunner.query(`DROP INDEX "IDX_d936bc8cf66eb2449b7e2a0c5e"`);
+        await queryRunner.query(`DROP INDEX "IDX_833bdd59c8fdaec6a0e2d162aa"`);
+        await queryRunner.query(`DROP TABLE "resolution_subjects_subject"`);
+        await queryRunner.query(`DROP TABLE "resolution_vote"`);
+        await queryRunner.query(`DROP TABLE "document_url"`);
+        await queryRunner.query(`DROP TABLE "resolution"`);
+        await queryRunner.query(`DROP TABLE "subject"`);
+        await queryRunner.query(`DROP TABLE "agenda"`);
+        await queryRunner.query(`DROP TABLE "author"`);
+        await queryRunner.query(`DROP TABLE "country"`);
+        await queryRunner.query(`DROP TABLE "slug_alias"`);
+        await queryRunner.query(`DROP TABLE "read_cursor"`);
+    }
+
+}

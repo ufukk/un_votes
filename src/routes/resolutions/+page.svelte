@@ -3,7 +3,7 @@
 
   // Define types for resolutions and filters
   type Resolution = {
-    symbol: string;
+    resolutionId: string;
     title: string;
     date: Date;
     detailsUrl: string;
@@ -261,7 +261,7 @@
           <div class="resolution-item">
             <h3>{resolution.title}</h3>
             <p>Date: {new Date(resolution.date).toLocaleDateString()}</p>
-            <a href="/resolutions/details?id={resolution.symbol}" target="_blank">View Details</a>
+            <a href="/resolutions/{resolution.resolutionId}" target="_blank">View Details</a>
           </div>
         {/each}
       {:else}
