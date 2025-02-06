@@ -1,6 +1,7 @@
 import "reflect-metadata"
-import { defaultDataSource, ResolutionRepository, CountryRepository, AuthorRepository, AgendaRepository, SubjectRepository, ResolutionVoteRepository, ResolutionType, VotingType, ResolutionStatus, Vote } from '../reader/models';
-import { getResolutionVotes, findTopVotingPartners, findMatchingVotingCountries } from '../analysis/resolutions';
+import { defaultDataSource, YearRange, ResolutionRepository, CountryRepository, AuthorRepository, AgendaRepository, SubjectRepository, ResolutionVoteRepository, ResolutionType, VotingType, ResolutionStatus, Vote } from '../reader/models';
+import { getResolutionVotes, findTopVotingPartners, findMatchingVotingCountries, findMostActiveCountries, fetchVotingData, clusterCountriesByVoting } from '../analysis/resolutions';
+import { findFrequentVotingGroups, findFrequentVotingGroupsHier, findFrequentVotingGroupsFlat, findCountryGroup } from '../analysis/groups'
 
 // Initialize the database connection
 async function initializeDB() {
@@ -11,13 +12,14 @@ async function initializeDB() {
 }
 
 // Query resolutions by year
-async function queryResolutionsByYear(year: number) {
+async function queryResolutionsByYear(year: number, votingType: 'general' | 'security' | null=null) {
+    const type = votingType == 'security' ? VotingType.SecurityCouncil : (votingType == 'general' ? VotingType.GeneralCouncil : null)
     const resolutionRepo = ResolutionRepository.createInstance(defaultDataSource);
-    const count = await resolutionRepo.resolutionCountByYear(year)
-    const resolutions = await resolutionRepo.resolutionsByYear(year, 50, 0);
+    const count = await resolutionRepo.resolutionCountByYear(year, type)
+    const resolutions = await resolutionRepo.resolutionsByYear(year, 50, 0, type);
     console.log(`Resolutions for year ${year} [Total: ${count}]:`);
     console.table(resolutions.map(res => ({
-        Symbol: res.symbol,
+        Symbol: res.resolutionSymbol,
         Title: res.title.substring(0, 30),
         Date: res.date, // Format date as YYYY-MM-DD
         Status: ResolutionStatus[res.resolutionStatus],
@@ -34,10 +36,10 @@ async function queryResolutionsByAgenda(agendaName: string) {
     }
 
     const resolutionRepo = ResolutionRepository.createInstance(defaultDataSource);
-    const resolutions = await resolutionRepo.resolutionsByAgenda(agenda.agenda_id, 50, 0);
+    const resolutions = await resolutionRepo.resolutionsByAgenda(agenda.agendaId, 50, 0);
     console.log(`Resolutions for agenda "${agendaName}":`);
     console.table(resolutions.map(res => ({
-        Symbol: res.symbol,
+        Symbol: res.resolutionSymbol,
         Title: res.title,
         Date: res.date.toISOString().split('T')[0], // Format date as YYYY-MM-DD
         Status: ResolutionStatus[res.resolutionStatus],
@@ -88,7 +90,7 @@ async function querySubjectByName(subjectName: string) {
 async function queryVotesForResolution(symbol: string) {
     const resolutionRepo = ResolutionRepository.createInstance(defaultDataSource);
     const resolution = await resolutionRepo.findOne({
-        where: { symbol },
+        where: { resolutionSymbol: symbol },
         relations: ['votes', 'votes.country'],
     });
     if (!resolution) {
@@ -112,16 +114,32 @@ async function queryYearResolutionNumbers() {
     })));
 }
 
-async function topVotingPartners(slug, num: number) {
-    const selected = ['united-states', 'germany', 'france', 'turkey', 'romania', 'india', 'norway', 'netherlands', 'israel', 'greece', 'switzerland', 'sweden']
-    if(!(slug in selected)) {
-        selected.push(slug)
-    }
-    const countries = await findMatchingVotingCountries(slug, 200);
-    const topCountries = countries.slice(0, num * 5).map(country => country.slug);
-    const partners = await findTopVotingPartners(slug, num, topCountries);
+async function topVotingPartners(slug: string, start: number, finish: number, num: number, reverse: boolean = false) {
+    const range = new YearRange(start, finish)
+    console.log(`From ${range.start} to ${range.finish} ...`)
+    const threshold = (finish - start) > 0 ? (finish - start) * 20 : (finish - start)
+    const countries = await findMatchingVotingCountries(slug, range, threshold);
+    const topCountries = countries.slice(0, num * 10).map(country => country.slug);
+    const partners = await findTopVotingPartners(slug, num, topCountries, range, reverse);
     console.table(partners.map(partner => ({ Partner: partner.country, Alignment: partner.alignment })));
 }
+
+async function votingClusters() {
+    //const groups = await findFrequentVotingGroups(new YearRange(2023, 2023), VotingType.SecurityCouncil)
+    const groups = await findFrequentVotingGroupsFlat(new YearRange(2023, 2023))
+    const country = 'turkey'
+    const group = findCountryGroup(country, groups)
+    console.log(groups)
+    if(group) {
+        console.log(`GROUP: ${group.group}`)
+    } else {
+        console.log(`NOT FOUND: ${country}`)
+    }
+    //const range = new YearRange(2023, 2025);
+    //const clusters = await clusterCountriesByVoting(range)
+    //console.table(Object.keys(clusters).map(cls => ({ Countries: clusters[Number(cls)].join(',')})))
+}
+
 
 // Main function to handle command-line arguments
 async function main() {
@@ -132,7 +150,8 @@ async function main() {
 
     switch (command) {
         case 'resolutions-by-year':
-            await queryResolutionsByYear(Number(arg));
+            const votingType = process.argv.length > 4 && (process.argv[4] === 'general' || process.argv[4] === 'security') ? process.argv[4] as 'general' | 'security' : null;
+            await queryResolutionsByYear(Number(arg), votingType);
             break;
         case 'resolutions-by-agenda':
             await queryResolutionsByAgenda(arg);
@@ -153,7 +172,10 @@ async function main() {
             await queryYearResolutionNumbers();
             break;
         case 'top-voting-partners':
-            await topVotingPartners(arg, process.argv.length > 4 ? Number(process.argv[4]) : 10);
+            await topVotingPartners(arg, Number(process.argv[4]), Number(process.argv[5]), process.argv.length > 6 ? Number(process.argv[6]) : 10, process.argv.length >= 8 && process.argv[7] == '0');
+            break
+        case 'voting-clusters':
+            await votingClusters();
             break
         case 'empty-all-tables':
             await emptyAllTables();
@@ -168,6 +190,7 @@ async function main() {
             console.log('- votes-for-resolution <symbol>');
             console.log('- query-year-resolution-numbers');
             console.log('- top-voting-partners <slug>');
+            console.log('- voting-clusters');
             console.log('- empty-all-tables');
             break;
     }

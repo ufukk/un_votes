@@ -25,6 +25,14 @@ export enum Vote {
     NonVoting = 4
 }
 
+export class YearRange {
+    
+    constructor(public readonly start: number, public readonly finish: number) {
+
+    }
+
+}
+
 @Entity()
 export class ReadCursor {
 
@@ -56,7 +64,7 @@ export class SlugAlias {
 export class Country {
     
     @PrimaryGeneratedColumn()
-    country_id: number
+    countryId: number
 
     @Column({unique: true, type: 'varchar'})
     name: string
@@ -81,7 +89,7 @@ export class Country {
 export class Author {
 
     @PrimaryGeneratedColumn()
-    author_id: number
+    authorId: number
 
     @Column({unique: true, type: 'varchar'})
     authorName: string
@@ -95,7 +103,7 @@ export class Author {
 export class Agenda {
 
     @PrimaryGeneratedColumn()
-    agenda_id: number
+    agendaId: number
 
     @Column({unique: true, type: 'varchar'})
     name: string
@@ -118,8 +126,11 @@ export class Subject {
 @Entity()
 export class Resolution {
 
-    @PrimaryColumn('varchar')
-    symbol: string
+    @PrimaryGeneratedColumn({type: 'integer'})
+    resolutionId: number
+
+    @Column({type: "varchar", unique: true})
+    resolutionSymbol: string
 
     @Column({type: "varchar"})
     title: string
@@ -153,6 +164,9 @@ export class Resolution {
     
     @Column({type: 'date'})
     date: Date
+
+    @Column({type: 'smallint'})
+    year: number
 
     @Column({type: 'varchar'})
     detailsUrl: string
@@ -205,7 +219,7 @@ export class DocumentUrl {
 export class ResolutionVote {
 
     @PrimaryGeneratedColumn({type: 'integer'})
-    vote_id: number
+    voteId: number
 
     @ManyToOne(() => Resolution, (resolution) => resolution.votes)
     resolution: Resolution
@@ -220,6 +234,7 @@ export class ResolutionVote {
 export const defaultDataSource = new DataSource({
     type: process.env.DB_TYPE as 'sqlite' || 'sqlite',
     database: process.env.DB_URL || 'storage/votes.db',
+    migrations: ['src/migrations/*.ts'],
     entities: [Subject, Resolution, Author, Country, Agenda, ResolutionVote, SlugAlias, ReadCursor, DocumentUrl]
 })
 
@@ -252,23 +267,27 @@ export class ResolutionRepository extends BaseRepository<Resolution> {
         return vote_map
     }
 
-    async resolutionsByYear(year: number, limit: number, offset: number): Promise<Resolution[]> {
+    async resolutionsByYear(year: number, limit: number, offset: number, votingType: VotingType | null=null): Promise<Resolution[]> {
         const startDate = new Date(year, 0, 1);
         const endDate = new Date(year + 1, 0, 1);
-        return this.createQueryBuilder('resolution')
-          .where('date >= :startDate AND date < :endDate', { startDate, endDate })
+        let q = this.createQueryBuilder('resolution')
+          .where('year = :year', { year })
           .orderBy('date', 'ASC')
           .skip(offset)
           .take(limit)
-          .getMany();
+        if(votingType) {
+            q = q.andWhere('votingType = :votingType', {votingType})
+        }
+        return q.getMany()
     }
       
-    async resolutionCountByYear(year: number): Promise<number> {
-        const startDate = new Date(year, 0, 1);
-        const endDate = new Date(year + 1, 0, 1);
-        return this.createQueryBuilder('resolution')
-          .where('date >= :startDate AND date < :endDate', { startDate, endDate })
-          .getCount();
+    async resolutionCountByYear(year: number, votingType: VotingType | null=null): Promise<number> {
+        let q = this.createQueryBuilder('resolution')
+          .where('year >= :year AND year <= :year', { year })
+        if(votingType) {
+            q = q.andWhere('votingType = :votingType', {votingType})
+        }
+        return  q.getCount();
     }
 
     async resolutionsByAgenda(agenda: number, limit: number, offset: number): Promise<Resolution[]> {
@@ -282,7 +301,7 @@ export class ResolutionRepository extends BaseRepository<Resolution> {
     }
     
     async doesResolutionCodeExist(symbol: string): Promise<boolean> {
-        return (await this.countBy({symbol: symbol})) > 0
+        return (await this.countBy({resolutionSymbol: symbol})) > 0
     }
 
     async latestYear(): Promise<number> {

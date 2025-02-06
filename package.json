@@ -1,46 +1,38 @@
 {
-  "name": "un_votes",
-  "version": "0.0.1",
-  "description": "\"U.N. Voting Database & Browser & Analysis Tool\"",
-  "main": "./dist/index.js",
-  "scripts": {
-    "test": "jest",
-    "build": "tsc",
-    "importer": "npm run build && node dist/src/scripts/importer.js",
-    "start": "npm run build && node -e \"import('./dist/src/scripts/runner.js').then(m => m.main());\"",
-    "db": "npm run build && node dist/src/scripts/db.js"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+ssh://git@github.com/ufukk/un_votes.git"
-  },
-  "keywords": [
-    "united",
-    "nations",
-    "web",
-    "politics",
-    "civic-data",
-    "charts",
-    "maps"
-  ],
-  "author": "ufuk kocolu",
-  "license": "GPL-3.0",
-  "bugs": {
-    "url": "https://github.com/ufukk/un_votes/issues"
-  },
-  "homepage": "https://github.com/ufukk/un_votes#readme",
-  "dependencies": {
-    "@types/jsdom": "^21.1.6",
-    "axios": "^1.6.2",
-    "fast_array_intersect": "^1.1.0",
-    "jsdom": "^23.0.1",
-    "knex": "^3.1.0",
-    "reflect-metadata": "^0.1.14",
-    "sqlite3": "^5.1.6",
-    "typeorm": "^0.3.17",
-    "typescript": "^5.3.2"
-  },
-  "devDependencies": {
-    "@types/node": "^20.10.4"
-  }
+	"name": "un-voting-facade",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"typeorm": "typeorm-ts-node-esm"
+	},
+	"devDependencies": {
+		"@sveltejs/adapter-auto": "^4.0.0",
+		"@sveltejs/kit": "^2.16.0",
+		"@sveltejs/vite-plugin-svelte": "^5.0.0",
+		"@types/jsdom": "^21.1.7",
+		"@types/reflect-metadata": "^0.0.5",
+		"svelte": "^5.0.0",
+		"svelte-check": "^4.0.0",
+		"tsx": "^4.19.2",
+		"typescript": "^5.0.0",
+		"vite": "^6.0.0"
+	},
+	"dependencies": {
+		"axios": "^1.7.9",
+		"csv-parse": "^5.6.0",
+		"jsdom": "^26.0.0",
+		"ml-hclust": "^3.1.0",
+		"ml-kmeans": "^6.0.0",
+		"reflect-metadata": "^0.2.2",
+		"sqlite3": "^5.1.7",
+		"ts-node": "^10.9.2",
+		"typeorm": "^0.3.20"
+	}
 }

@@ -42,7 +42,7 @@ abstract class Transformer<K, T extends Transformable> {
 
 export class CountryNameTransformer extends Transformer<string, Country> {
     
-    protected repository: CountryRepository
+    protected repository: CountryRepository = null
 
     constructor(protected readonly dataSource: DataSource) {
         super(dataSource)
@@ -94,7 +94,7 @@ export class DocumentUrlTransformer extends Transformer<DocumentUrlItem, Documen
 
 export class AuthorTransformer extends Transformer<string, Author> {
 
-    protected repository: AuthorRepository
+    protected repository: AuthorRepository = null
     protected countryRepository: CountryRepository
     protected names: Map<string, number>
 
@@ -127,7 +127,7 @@ export class AuthorTransformer extends Transformer<string, Author> {
 
 export class AgendaNameTransformer extends Transformer<string, Agenda> {
     
-    protected repository: AgendaRepository
+    protected repository: AgendaRepository = null
 
     constructor(protected readonly dataSource: DataSource) {
         super(dataSource)
@@ -155,7 +155,7 @@ export class AgendaNameTransformer extends Transformer<string, Agenda> {
 
 export class SubjectTransformer extends Transformer<string, Subject> {
     
-    protected repository: SubjectRepository
+    protected repository: SubjectRepository = null
     private names: Map<string, number>
 
     constructor(protected readonly dataSource: DataSource) {
@@ -185,7 +185,7 @@ export class SubjectTransformer extends Transformer<string, Subject> {
 
 export class ResolutionTransformer extends Transformer<ResolutionPage, Resolution> {
     
-    protected repository: ResolutionRepository
+    protected repository: ResolutionRepository = null
     protected agendaTransformer: AgendaNameTransformer
     protected subjectTransformer: SubjectTransformer
     protected authorTransformer: AuthorTransformer
@@ -267,12 +267,13 @@ export class ResolutionTransformer extends Transformer<ResolutionPage, Resolutio
 
     async transform(item: ResolutionPage): Promise<Resolution> {
         let resolution = new Resolution()
-        resolution.symbol = item.symbol
+        resolution.resolutionSymbol = item.symbol
         resolution.votingType = this.findResolutionType(item)
         resolution.resolutionStatus = this.findResolutionStatus(item)
         resolution.notes = item.notes
         resolution.title = item.title
         resolution.date = item.date
+        resolution.year = item.date.getFullYear()
         resolution.detailsUrl = item.detailsUrl
         resolution.voteSummary = item.voteSummary
         resolution.agendas = await this.__agendas(item)
@@ -284,7 +285,7 @@ export class ResolutionTransformer extends Transformer<ResolutionPage, Resolutio
     }
 
     async exists(item: Resolution): Promise<boolean> {
-        return (await this.repository.countBy({symbol: item.symbol})) > 0
+        return (await this.repository.countBy({resolutionSymbol: item.resolutionSymbol})) > 0
     }
 
 }
@@ -312,7 +313,7 @@ export class ResolutionVoteTransformer extends Transformer<[string, string], Res
     }
     
     isNew(item: ResolutionVote): boolean {
-        return item.vote_id == undefined
+        return item.voteId == undefined
     }
 
     async exists(item: ResolutionVote): Promise<boolean> {
