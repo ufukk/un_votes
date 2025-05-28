@@ -101,22 +101,20 @@ export class AuthorTransformer extends Transformer<string, Author> {
     constructor(protected readonly dataSource: DataSource) {
         super(dataSource)
         this.repository = AuthorRepository.createInstance(this.dataSource)
+        this.countryRepository = CountryRepository.createInstance(this.dataSource)
         this.names = new Map<string, number>()
     }
 
     async transform(item: string): Promise<Author> {
-        let author = await this.repository.findOneBy({authorName: item})
-        if(author == null) {
-            const countryTransformer = new CountryNameTransformer(this.dataSource)
-            let country = await countryTransformer.transform(item)
-            if(!(await countryTransformer.exists(country))) {
-                country = null
-            }
-            author = new Author()
+        const country = await new CountryNameTransformer(this.dataSource).ensureExists(item)
+        const existingAuthor = await this.repository.findOneBy({country: country})
+        if(!existingAuthor) {
+            const author = new Author()
             author.authorName = item
             author.country = country
+            return author
         }
-        return author
+        return existingAuthor
     }
     
     async exists(item: Author): Promise<boolean> {
@@ -238,7 +236,7 @@ export class ResolutionTransformer extends Transformer<ResolutionPage, Resolutio
         if(item.title.match(/adopted by/)) {
             return ResolutionStatus.AdoptedWithoutVote
         }
-        throw new TransformationError(item, `Resolution status could not be determined <${item.symbol}> | <${item.notes}>`)
+        return ResolutionStatus.Unknown
     }
 
     private async __subjects(item: ResolutionPage): Promise<Subject[]> {

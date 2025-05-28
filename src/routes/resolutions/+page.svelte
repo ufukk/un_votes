@@ -1,5 +1,9 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount } from "svelte";
+
+  const data = $props();
+
+  console.log(data);
 
   // Define types for resolutions and filters
   type Resolution = {
@@ -31,19 +35,19 @@
     isLoading = true;
     try {
       const params = new URLSearchParams();
-      if (selectedYear) params.set('year', selectedYear.toString());
-      if (selectedAgenda) params.set('agenda', selectedAgenda.toString());
-      params.set('page', currentPage.toString());
-      params.set('limit', itemsPerPage.toString());
+      if (selectedYear) params.set("year", selectedYear.toString());
+      if (selectedAgenda) params.set("agenda", selectedAgenda.toString());
+      params.set("page", currentPage.toString());
+      params.set("limit", itemsPerPage.toString());
 
       const response = await fetch(`/api/resolutions?${params.toString()}`);
-      if (!response.ok) throw new Error('Failed to fetch resolutions');
+      if (!response.ok) throw new Error("Failed to fetch resolutions");
 
       const data = await response.json();
       resolutions = data.resolutions;
       totalPages = data.totalPages;
     } catch (error) {
-      console.error('Error fetching resolutions:', error);
+      console.error("Error fetching resolutions:", error);
     } finally {
       isLoading = false;
     }
@@ -67,7 +71,7 @@
     if (currentPage - halfVisible > 1) {
       pages.push(1);
       if (currentPage - halfVisible > 2) {
-        pages.push('...');
+        pages.push("...");
       }
     }
 
@@ -77,7 +81,7 @@
 
     if (currentPage + halfVisible < totalPages) {
       if (currentPage + halfVisible < totalPages - 1) {
-        pages.push('...');
+        pages.push("...");
       }
       pages.push(totalPages);
     }
@@ -89,21 +93,107 @@
   onMount(async () => {
     try {
       const [yearsResponse, agendasResponse] = await Promise.all([
-        fetch('/api/resolutions/years'),
-        fetch('/api/resolutions/agendas'),
+        fetch("/api/resolutions/years"),
+        fetch("/api/resolutions/agendas"),
       ]);
 
       if (!yearsResponse.ok || !agendasResponse.ok) {
-        throw new Error('Failed to fetch initial data');
+        throw new Error("Failed to fetch initial data");
       }
 
       years = await yearsResponse.json();
       agendas = await agendasResponse.json();
     } catch (error) {
-      console.error('Error fetching initial data:', error);
+      console.error("Error fetching initial data:", error);
     }
   });
 </script>
+
+<div class="container">
+  <h1>Resolutions</h1>
+
+  <!-- Filters -->
+  <div class="filters">
+    <select
+      bind:value={selectedYear}
+      on:change={() => {
+        currentPage = 1;
+        fetchResolutions();
+      }}
+    >
+      <option value={null}>Select Year</option>
+      {#each years as year}
+        <option value={year}>{year}</option>
+      {/each}
+    </select>
+
+    <select
+      bind:value={selectedAgenda}
+      on:change={() => {
+        currentPage = 1;
+        fetchResolutions();
+      }}
+    >
+      <option value={null}>Select Agenda</option>
+      {#each agendas as agenda}
+        <option value={agenda.agenda_id}>{agenda.name}</option>
+      {/each}
+    </select>
+  </div>
+
+  <!-- Loading State -->
+  {#if isLoading}
+    <p class="loading">Loading resolutions...</p>
+  {:else}
+    <!-- Resolutions List -->
+    <div class="resolutions-list">
+      {#if resolutions.length > 0}
+        {#each resolutions as resolution}
+          <div class="resolution-item">
+            <h3>{resolution.title}</h3>
+            <p>Date: {new Date(resolution.date).toLocaleDateString()}</p>
+            <a href="/resolutions/{resolution.resolutionId}" target="_blank"
+              >View Details</a
+            >
+          </div>
+        {/each}
+      {:else}
+        <p class="loading">No resolutions found.</p>
+      {/if}
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination">
+      <button on:click={() => goToPage(1)} disabled={currentPage === 1}
+        >First</button
+      >
+      <button
+        on:click={() => goToPage(currentPage - 1)}
+        disabled={currentPage === 1}>Previous</button
+      >
+      {#each getVisiblePages() as page}
+        {#if page === "..."}
+          <span class="ellipsis">...</span>
+        {:else}
+          <button
+            on:click={() => goToPage(page)}
+            class={currentPage === page ? "active" : ""}
+          >
+            {page}
+          </button>
+        {/if}
+      {/each}
+      <button
+        on:click={() => goToPage(currentPage + 1)}
+        disabled={currentPage === totalPages}>Next</button
+      >
+      <button
+        on:click={() => goToPage(totalPages)}
+        disabled={currentPage === totalPages}>Last</button
+      >
+    </div>
+  {/if}
+</div>
 
 <style>
   .container {
@@ -161,7 +251,9 @@
     border-radius: 8px;
     background-color: #fff;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
   }
 
   .resolution-item:hover {
@@ -205,7 +297,9 @@
     border-radius: 4px;
     background-color: #fff;
     cursor: pointer;
-    transition: background-color 0.3s ease, color 0.3s ease;
+    transition:
+      background-color 0.3s ease,
+      color 0.3s ease;
   }
 
   .pagination button:hover {
@@ -229,64 +323,3 @@
     cursor: default;
   }
 </style>
-
-<div class="container">
-  <h1>Resolutions</h1>
-
-  <!-- Filters -->
-  <div class="filters">
-    <select bind:value={selectedYear} on:change={() => { currentPage = 1; fetchResolutions(); }}>
-      <option value={null}>Select Year</option>
-      {#each years as year}
-        <option value={year}>{year}</option>
-      {/each}
-    </select>
-
-    <select bind:value={selectedAgenda} on:change={() => { currentPage = 1; fetchResolutions(); }}>
-      <option value={null}>Select Agenda</option>
-      {#each agendas as agenda}
-        <option value={agenda.agenda_id}>{agenda.name}</option>
-      {/each}
-    </select>
-  </div>
-
-  <!-- Loading State -->
-  {#if isLoading}
-    <p class="loading">Loading resolutions...</p>
-  {:else}
-    <!-- Resolutions List -->
-    <div class="resolutions-list">
-      {#if resolutions.length > 0}
-        {#each resolutions as resolution}
-          <div class="resolution-item">
-            <h3>{resolution.title}</h3>
-            <p>Date: {new Date(resolution.date).toLocaleDateString()}</p>
-            <a href="/resolutions/{resolution.resolutionId}" target="_blank">View Details</a>
-          </div>
-        {/each}
-      {:else}
-        <p class="loading">No resolutions found.</p>
-      {/if}
-    </div>
-
-    <!-- Pagination -->
-    <div class="pagination">
-      <button on:click={() => goToPage(1)} disabled={currentPage === 1}>First</button>
-      <button on:click={() => goToPage(currentPage - 1)} disabled={currentPage === 1}>Previous</button>
-      {#each getVisiblePages() as page}
-        {#if page === '...'}
-          <span class="ellipsis">...</span>
-        {:else}
-          <button
-            on:click={() => goToPage(page)}
-            class={currentPage === page ? 'active' : ''}
-          >
-            {page}
-          </button>
-        {/if}
-      {/each}
-      <button on:click={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages}>Next</button>
-      <button on:click={() => goToPage(totalPages)} disabled={currentPage === totalPages}>Last</button>
-    </div>
-  {/if}
-</div>

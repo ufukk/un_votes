@@ -8,7 +8,7 @@ export async function findFrequentVotingGroups(yearRange: YearRange, votingType:
     const countryRepository = connection.getRepository(Country);
 
     // Fetch all resolutions within the year range
-    let q = await connection.getRepository(Resolution)
+    let q = connection.getRepository(Resolution)
         .createQueryBuilder('resolution')
         .where('resolution.year >= :start AND resolution.year <= :finish', { start: yearRange.start, finish: yearRange.finish })
 

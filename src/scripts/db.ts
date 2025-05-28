@@ -1,7 +1,9 @@
 import "reflect-metadata"
-import { defaultDataSource, YearRange, ResolutionRepository, CountryRepository, AuthorRepository, AgendaRepository, SubjectRepository, ResolutionVoteRepository, ResolutionType, VotingType, ResolutionStatus, Vote } from '../reader/models';
+import { defaultDataSource, YearRange, ResolutionRepository, CountryRepository, AuthorRepository, AgendaRepository, SubjectRepository, ResolutionVoteRepository, ResolutionType, VotingType, ResolutionStatus, Vote, make_slug, SlugAliasRepository } from '../reader/models';
 import { getResolutionVotes, findTopVotingPartners, findMatchingVotingCountries, findMostActiveCountries, fetchVotingData, clusterCountriesByVoting } from '../analysis/resolutions';
 import { findFrequentVotingGroups, findFrequentVotingGroupsHier, findFrequentVotingGroupsFlat, findCountryGroup } from '../analysis/groups'
+import { extractKeywords, extractNouns, extractKeywords2 } from '../analysis/keywords'
+import { Like } from 'typeorm';
 
 // Initialize the database connection
 async function initializeDB() {
@@ -73,17 +75,19 @@ async function queryAuthorByName(authorName: string) {
 }
 
 // Query subjects by name
-async function querySubjectByName(subjectName: string) {
+async function querySubjects() {
     const subjectRepo = SubjectRepository.createInstance(defaultDataSource);
-    const subject = await subjectRepo.fetchByName(subjectName);
-    if (!subject) {
-        console.log(`Subject "${subjectName}" not found.`);
-        return;
+    const subjects = await subjectRepo.find({order: {subjectName: 'ASC'}});
+    console.table(subjects.map(sbj => ({Name: sbj.subjectName})));
+}
+
+// Query subjects by name
+async function queryAgendas(query: string) {
+    const repo = AgendaRepository.createInstance(defaultDataSource);
+    const names = (await repo.find({where: {name: Like(`%${query}%`)}, order: {name: 'ASC'} })).map((agenda) => agenda.un_name)
+    for(const keyword of names) {
+        console.log(extractKeywords2(keyword));
     }
-    console.log(`Subject details for "${subjectName}":`);
-    console.table([{
-        Name: subject.subjectName,
-    }]);
 }
 
 // Query votes for a resolution
@@ -125,11 +129,9 @@ async function topVotingPartners(slug: string, start: number, finish: number, nu
 }
 
 async function votingClusters() {
-    //const groups = await findFrequentVotingGroups(new YearRange(2023, 2023), VotingType.SecurityCouncil)
-    const groups = await findFrequentVotingGroupsFlat(new YearRange(2023, 2023))
+    const groups = await findFrequentVotingGroupsFlat(new YearRange(2023, 2024))
     const country = 'turkey'
     const group = findCountryGroup(country, groups)
-    console.log(groups)
     if(group) {
         console.log(`GROUP: ${group.group}`)
     } else {
@@ -137,9 +139,24 @@ async function votingClusters() {
     }
     //const range = new YearRange(2023, 2025);
     //const clusters = await clusterCountriesByVoting(range)
-    //console.table(Object.keys(clusters).map(cls => ({ Countries: clusters[Number(cls)].join(',')})))
+    console.table(groups.map(grp => ({ Countries: grp.group.join(', '), Compability: grp.averageCompatibility})))
 }
 
+async function addAlias(slug: string, alias: string) {
+    if(!slug || !alias) {
+        console.log('a slug and an alias is required');
+        return;
+    }
+    const repo = SlugAliasRepository.createInstance(defaultDataSource);
+    const doesExist = await repo.existsBy({alias: alias})
+    if(doesExist) {
+        console.log(`Alias ${alias} already exists`);
+        return
+    }
+    const slugAlias = repo.create({slug: slug, alias: alias});
+    await repo.save(slugAlias)
+    console.log(`Alias for ${slug} created`);
+}
 
 // Main function to handle command-line arguments
 async function main() {
@@ -162,8 +179,11 @@ async function main() {
         case 'author-by-name':
             await queryAuthorByName(arg);
             break;
-        case 'subject-by-name':
-            await querySubjectByName(arg);
+        case 'subjects':
+            await querySubjects();
+            break;
+        case 'agendas':
+            await queryAgendas(arg);
             break;
         case 'votes-for-resolution':
             await queryVotesForResolution(arg);
@@ -177,21 +197,29 @@ async function main() {
         case 'voting-clusters':
             await votingClusters();
             break
-        case 'empty-all-tables':
+        case 'add-alias':
+            await addAlias(arg, process.argv[4]);
+            break
+        case '---empty-all-tables-----':
             await emptyAllTables();
+            break;
+        case 'make-slug':
+            console.log(make_slug(arg));
             break;
         default:
             console.log('Available commands:');
             console.log('- resolutions-by-year <year>');
             console.log('- resolutions-by-agenda <agendaName>');
             console.log('- countries');
+            console.log('- agendas');
             console.log('- author-by-name <authorName>');
-            console.log('- subject-by-name <subjectName>');
+            console.log('- subjects');
             console.log('- votes-for-resolution <symbol>');
             console.log('- query-year-resolution-numbers');
             console.log('- top-voting-partners <slug>');
             console.log('- voting-clusters');
-            console.log('- empty-all-tables');
+            console.log('- make-slug');
+            console.log('- add-alias <slug> <alias>');
             break;
     }
 

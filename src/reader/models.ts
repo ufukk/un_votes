@@ -15,7 +15,8 @@ export enum VotingType {
 export enum ResolutionStatus {
     AdoptedWithoutVote = 1,
     VotedAndAdopted = 2,
-    VotedAndRejected = 3
+    VotedAndRejected = 3,
+    Unknown = 4
 }
 
 export enum Vote {
@@ -227,7 +228,7 @@ export class ResolutionVote {
     @ManyToOne((type) => Country, {eager: true})
     country: Country
 
-    @Column({enum: Vote, type: 'varchar'})
+    @Column({enum: Vote, type: 'integer'})
     vote: Vote
 }
 

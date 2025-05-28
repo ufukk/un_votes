@@ -1,7 +1,7 @@
 import { match, ok } from 'assert'
 import { default as axios } from 'axios'
 import { JSDOM } from 'jsdom'
-import * as fs from 'fs' 
+import * as fs from 'fs'
 import { report } from '../utils'
 
 class PathError extends Error {
@@ -23,8 +23,7 @@ export class DocumentReference {
         public readonly date: Date,
         public readonly resolutionCode: string,
         public readonly authors: string,
-        public readonly url: string)
-    {
+        public readonly url: string) {
     }
 }
 
@@ -49,7 +48,7 @@ class ResolutionCursor {
 class CodeUrl {
 
     public constructor(public readonly code: string,
-        public readonly url: string = null) {}
+        public readonly url: string = null) { }
 }
 
 export const YES_VALUE = 'Y'
@@ -114,7 +113,7 @@ export class ResolutionPage implements IDocument {
 
     static new(
         {
-            symbol, 
+            symbol,
             title,
             alternativeTitles = [],
             agendas = [],
@@ -137,31 +136,31 @@ export class ResolutionPage implements IDocument {
             textLinks = null
         }: IDocument
     ): ResolutionPage {
-        return new ResolutionPage(new DocumentPage({title: null, date: new Date(), collections: [], detailsUrl, votes: votes, voteSummary: voteSummary}), 
-                                new DocumentPage({
-                                    symbol: symbol,
-                                    title: title,
-                                    alternativeTitles: alternativeTitles,
-                                    agendas: agendas,
-                                    agendaInformation: agendaInformation,
-                                    resolutionCode: resolutionCode,
-                                    meetingRecordCode: meetingRecordCode,
-                                    draftResolutionCode: draftResolutionCode,
-                                    committeeReportCode: committeeReportCode,
-                                    callNumber: callNumber,
-                                    detailsUrl: detailsUrl,
-                                    resolutionOrDecision: resolutionOrDecision,
-                                    authors: authors,
-                                    description: description,
-                                    notes: notes,
-                                    subjects: subjects,
-                                    textLinks: textLinks,
-                                    collections: collections,
-                                    date: date
-                }))  
-    } 
+        return new ResolutionPage(new DocumentPage({ title: null, date: new Date(), collections: [], detailsUrl, votes: votes, voteSummary: voteSummary }),
+            new DocumentPage({
+                symbol: symbol,
+                title: title,
+                alternativeTitles: alternativeTitles,
+                agendas: agendas,
+                agendaInformation: agendaInformation,
+                resolutionCode: resolutionCode,
+                meetingRecordCode: meetingRecordCode,
+                draftResolutionCode: draftResolutionCode,
+                committeeReportCode: committeeReportCode,
+                callNumber: callNumber,
+                detailsUrl: detailsUrl,
+                resolutionOrDecision: resolutionOrDecision,
+                authors: authors,
+                description: description,
+                notes: notes,
+                subjects: subjects,
+                textLinks: textLinks,
+                collections: collections,
+                date: date
+            }))
+    }
 
-    constructor(votingData: DocumentPage, resolutionOrDraft: DocumentPage=null) {
+    constructor(votingData: DocumentPage, resolutionOrDraft: DocumentPage = null) {
         this.voteSummary = resolutionOrDraft.voteSummary || votingData.voteSummary
         this.votes = votingData.votes
         this.symbol = resolutionOrDraft.symbol || votingData.resolutionCode.code
@@ -208,7 +207,7 @@ export class DocumentPage implements IDocument {
     readonly textLinks?: TextLinks
 
     constructor({
-        symbol, 
+        symbol,
         title,
         alternativeTitles = [],
         agendas = [],
@@ -256,8 +255,8 @@ export class DocumentPage implements IDocument {
 
     protected _votesByValue(value: string): string[] {
         const keys = []
-        for(const key in this.votes) {
-            if(this.votes[key] == value) {
+        for (const key in this.votes) {
+            if (this.votes[key] == value) {
                 keys.push(key)
             }
         }
@@ -296,7 +295,7 @@ export class HtmlParser {
 
     protected _sure_first(el: Element | Document, query: string): Element {
         let found = el.querySelector(query) as Element
-        if(found == null) {
+        if (found == null) {
             throw new PathError(query)
         }
         return found
@@ -323,15 +322,15 @@ export class HtmlParser {
 }
 
 abstract class ParserValue {
-    
-    constructor(public readonly query: string) {    }
+
+    constructor(public readonly query: string) { }
 
     abstract valueOf(parser: HtmlParser, element: Element | null): any
 
 }
 
 class ParserValueText extends ParserValue {
-    
+
     valueOf(parser: HtmlParser, element: Element | null): string {
         return parser.find(this.query, element).textContent
     }
@@ -350,7 +349,7 @@ class ParserValueAttribute extends ParserValue {
 }
 
 class ParserValueList extends ParserValue {
-    
+
     constructor(query: string, public readonly subQueries: Record<string, ParserValue>) {
         super(query)
     }
@@ -359,7 +358,7 @@ class ParserValueList extends ParserValue {
         let results = []
         parser.search(this.query, element).forEach((el: Element) => {
             let item = {}
-            for(let key in this.subQueries) {
+            for (let key in this.subQueries) {
                 let parserValue = this.subQueries[key]
                 item[key] = parserValue.valueOf(parser, el)
             }
@@ -367,7 +366,7 @@ class ParserValueList extends ParserValue {
         })
         return results
     }
-    
+
 }
 
 export interface UrlReader {
@@ -383,22 +382,56 @@ export interface UrlReader {
 }
 
 export class AxiosUrlReader implements UrlReader {
-    
+
     public response: axios.AxiosResponse
     public lastUrl: string
 
-    public getHeaders(): Record<string, string>  {
-        let values = {'Accept': 'text/html',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/113.0'
+    public getHeaders(): Record<string, string> {
+        let values = {
+            'Host': 'digitallibrary.un.org',
+            'User-Agent': this.getUserAgent(),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate, br, zstd',
+            'Sec-GPC': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Priority': 'u=0, i'
         }
         return values
     }
 
+    private getUserAgent() {
+        const agents = [
+            'Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.3',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.3',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.3',
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 18_3_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/134.0.6998.99 Mobile/15E148 Safari/604.',
+            'Mozilla/5.0 (Linux; Android 10; JNY-LX1; HMSCore 6.15.0.302) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.5735.196 HuaweiBrowser/15.0.4.312 Mobile Safari/537.3',
+            'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.3',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.3124.85',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 OPR/118.0.0.0',
+            'Mozilla/5.0 (Windows NT 10.0; WOW64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 OPR/118.0.0.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 14.7; rv:136.0) Gecko/20100101 Firefox/136.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 OPR/118.0.0.0',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux i686; rv:128.0) Gecko/20100101 Firefox/128.0',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 OPR/118.0.0.0'
+        ]
+        return agents[Math.floor(Math.random() * agents.length)]
+    }
+
     async readUrl(url: string): Promise<boolean> {
         this.lastUrl = url
-        this.response = await axios.get(url, {headers: this.getHeaders()})
+        this.response = await axios.get(url, { headers: this.getHeaders() })
         return this.isSuccess()
     }
 
@@ -444,13 +477,13 @@ export class CachedAxiosUrlReader extends AxiosUrlReader {
         return this.__cachedData != undefined ? this.__cachedData : super.data()
     }
 
-    async readUrl(url: string, useCache=true): Promise<boolean> {
-        if(useCache && this.__isCached(url)) {
+    async readUrl(url: string, useCache = true): Promise<boolean> {
+        if (useCache && this.__isCached(url)) {
             this.__cachedData = this.__fromCache(url)
             return new Promise<boolean>((resolve) => resolve(true))
         } else {
             const result = await super.readUrl(url)
-            if(result) {
+            if (result) {
                 this.__writeCache(url, this.data())
             }
             return result
@@ -468,7 +501,7 @@ abstract class PageReader<T> {
 
     protected async _read() {
         const isSuccessful = await this.reader.readUrl(this.url)
-        if(!isSuccessful) {
+        if (!isSuccessful) {
             throw Error(`Url: ${this.url} failed: ${this.reader.responseData().status}`)
         }
         this._parser = new HtmlParser(this.reader.data())
@@ -480,11 +513,11 @@ abstract class PageReader<T> {
         return result
     }
 
-    protected _readQueries(): Record<string,any> {
-        if(this._queries == undefined)
+    protected _readQueries(): Record<string, any> {
+        if (this._queries == undefined)
             return
         let result = {}
-        for(let name in this._queries) {
+        for (let name in this._queries) {
             let query = this._queries[name]
             result[name] = query.valueOf(this._parser, null)
         }
@@ -495,7 +528,7 @@ abstract class PageReader<T> {
 }
 
 class GatewayPage {
-    public constructor(public readonly years: number[]) {}
+    public constructor(public readonly years: number[]) { }
 }
 
 export class GatewayReader extends PageReader<GatewayPage> {
@@ -507,9 +540,8 @@ export class GatewayReader extends PageReader<GatewayPage> {
     }
 
     protected findYears(): number[] {
-        return Array.from(new Set<number>(Array.from(this._parser.search('li>div>label>span'))
-        .filter((node) => node.textContent.trim().match(/^\d{4} \(\d+\)$/gm))
-        .map((node) => Number.parseInt(node.textContent.trim().substring(0, 4)))))
+        return Array.from(new Set<number>(Array.from(this._parser.domDocument.window.document.querySelectorAll('.option-fct')[7].children)
+            .map((node) => Number.parseInt(node.textContent.trim().substring(0, 4)))))
     }
 
     protected _parse(): GatewayPage {
@@ -520,7 +552,7 @@ export class GatewayReader extends PageReader<GatewayPage> {
 }
 
 export class DocumentListPageReader extends PageReader<DocumentListPage> {
-    
+
     static readonly pageSize: number = 50
     static readonly rootUrl = 'https://digitallibrary.un.org'
     static readonly indexUrl = 'https://digitallibrary.un.org/search?cc=Voting+Data&ln=en&c=Voting+Data'
@@ -544,20 +576,20 @@ export class DocumentListPageReader extends PageReader<DocumentListPage> {
 
     protected _readQueries(): Record<string, string> {
         let values = {}
-        values['numberOfRecords'] = Number.parseInt(this._parser.text('td.searchresultsboxheader>span>strong').replace(',',''))
+        values['numberOfRecords'] = Number.parseInt(this._parser.text('td.searchresultsboxheader>span>strong').replace(',', ''))
         values['references'] = []
         const rows = this._parser.search('div.result-row')
         const links = []
-        for(const linkRow of this._parser.search('div.moreinfo')) {
+        for (const linkRow of this._parser.search('div.moreinfo')) {
             links.push(DocumentListPageReader.rootUrl + linkRow.querySelector('a').attributes['href'].value)
         }
         let i = 0
-        for(let row of rows) {
+        for (let row of rows) {
             let title = row.querySelector('div.result-title>a').textContent
             let authors = row.querySelector('div.authors') ? row.querySelector('div.authors').textContent : null
             let briefOptions = row.querySelector('div.brief-options').textContent
             let url = links[i]
-            values['references'].push({title, authors, briefOptions, url})
+            values['references'].push({ title, authors, briefOptions, url })
             i++
         }
         return values
@@ -567,7 +599,7 @@ export class DocumentListPageReader extends PageReader<DocumentListPage> {
         let values = this._readQueries()
         let references = []
         let numberOfRecords = Number.parseInt(values['numberOfRecords'])
-        for(let ref of values['references']) {
+        for (let ref of values['references']) {
             let title = ref['title']
             let authors = ref['authors']
             let url = ref['url']
@@ -589,32 +621,31 @@ export abstract class DocumentPageReader extends PageReader<DocumentPage> {
     }
 
     protected _getAuthors(authorStr: string): string[] {
-        if(!authorStr) {
+        if (!authorStr) {
             return []
         }
         return Array.from(new Set<string>(Array.from(authorStr.matchAll(/<a[^>]*href=\"([^\"]+)\"[^>]*>([^<]+)<\/a>/gi))
-        .map((match: RegExpExecArray) => match[2])))
+            .map((match: RegExpExecArray) => match[2])))
     }
 
     protected _getAgendas(value: string): string[] {
-        if(!value)  {
+        if (!value) {
             return []
         }
         return Array.from(new Set<string>(Array.from(value.matchAll(/<a[^>]*href=\"([^\"]+)\"[^>]*>([^<]+)<\/a>/gi))
-        .map((match: RegExpExecArray) => match[2])))
+            .map((match: RegExpExecArray) => match[2])))
     }
 
-    protected _getDate(value: string): Date {
-        const dateStr = value.substring(value.indexOf(',') + 1).trim()
-        return new Date(dateStr)
+    protected _getDate(value: string): Date | null {
+        return value ? new Date(value.substring(value.indexOf(',') + 1).trim()) : null
     }
 
     protected _getSubjects(): string[] {
         try {
             const container = this._parser.find('ul.rs-group-list')
             return Array.from(new Set<string>(Array.from(container.querySelectorAll('a.rs-link'))
-                        .map((el: Element) => el.textContent)))
-        } catch(error) {
+                .map((el: Element) => el.textContent)))
+        } catch (error) {
             return []
         }
     }
@@ -626,11 +657,11 @@ export abstract class DocumentPageReader extends PageReader<DocumentPage> {
         }
         let matches = value.matchAll(/ *([YNA] )*([^<>]{4,})/g)
         let done = false
-        while(!done) {
+        while (!done) {
             let match = matches.next()
             done = match.done
             let m: RegExpExecArray = match.value
-            if(!m || done)
+            if (!m || done)
                 break
             let name = m[2]
             let vote = m[1] ? m[1].trim() : NONVOTING_VALUE
@@ -641,14 +672,14 @@ export abstract class DocumentPageReader extends PageReader<DocumentPage> {
 
     protected _getTextLinks(value: string): Record<string, string> {
         const links = {}
-        if(!value) {
+        if (!value) {
             return links
         }
         const langs = Array.from(value.matchAll(/<strong>([^<:]+):*<\/strong>/gim))
             .map((m) => m[1])
         const urls = Array.from(value.matchAll(/<a[^>]+href="([^>]+)">/gim))
             .map((m) => m[1])
-        for(let i = 0; i < langs.length; i++) {
+        for (let i = 0; i < langs.length; i++) {
             links[langs[i]] = DocumentListPageReader.rootUrl + urls[i]
         }
         return links
@@ -678,7 +709,7 @@ export abstract class DocumentPageReader extends PageReader<DocumentPage> {
     }
 
     protected _readCodeUrl(value: string): CodeUrl {
-        if(!value) {
+        if (!value) {
             return null
         }
         const matches = value.match(/<a[^>]+href="([^"]+)">([^<]+)<\/a>/)
@@ -689,7 +720,7 @@ export abstract class DocumentPageReader extends PageReader<DocumentPage> {
 
 export class VotingDataReader extends DocumentPageReader {
 
-    protected _parse(): DocumentPage { 
+    protected _parse(): DocumentPage {
         const values: Record<string, string> = this._readQueries()
         const resolutionCode = this._readCodeUrl(values['Resolution'])
         const draftResolutionCode = this._readCodeUrl(values['Draft resolution'])
@@ -703,7 +734,7 @@ export class VotingDataReader extends DocumentPageReader {
             draftResolutionCode: draftResolutionCode,
             committeeReportCode: committeeReportCode,
             notes: values['Note'],
-            date: this._getDate(values['Vote date']),
+            date: this._getDate(values['Vote date']) || this._getDate(values['Date']),
             voteSummary: values['Vote summary'],
             votes: this._getVotes(values['Vote']),
             collections: this._readCollections(values['Collections']),
@@ -780,7 +811,7 @@ export class MeetingRecordReader extends DocumentPageReader {
 }
 
 export class CommitteeReportReader extends DocumentPageReader {
-    
+
     protected _parse(): DocumentPage {
         const values: Record<string, string> = this._readQueries()
         return new DocumentPage({
@@ -800,16 +831,16 @@ export class CommitteeReportReader extends DocumentPageReader {
 }
 
 function buildReaderInstance(resolutionCode: CodeUrl, draftCode: CodeUrl, committeeCode: CodeUrl, meetingRecord: CodeUrl, urlReader: UrlReader): DocumentPageReader {
-    if(resolutionCode && resolutionCode.url) {
+    if (resolutionCode && resolutionCode.url && resolutionCode.url.includes('/record')) {
         return new ResolutionReader(new DocumentReference('', new Date(), resolutionCode.code, '', resolutionCode.url), urlReader)
     }
-    if(draftCode && draftCode.url) {
+    if (draftCode && draftCode.url) {
         return new DraftReader(new DocumentReference('', new Date(), draftCode.code, '', draftCode.url), urlReader)
     }
-    if(committeeCode && committeeCode.url) {
+    if (committeeCode && committeeCode.url) {
         return new CommitteeReportReader(new DocumentReference('', new Date(), committeeCode.code, '', committeeCode.url), urlReader)
     }
-    if(meetingRecord && meetingRecord.url) {
+    if (meetingRecord && meetingRecord.url) {
         return new MeetingRecordReader(new DocumentReference('', new Date(), meetingRecord.code, '', meetingRecord.url), urlReader)
     }
 }
@@ -818,24 +849,25 @@ export async function readResolutionsByYears(
     years: number[],
     batch: (result: { resolutions: ResolutionPage[], year: number }) => Promise<void>
 ): Promise<void> {
-    const concurrent = 6; // Number of concurrent requests
+    const concurrent = 5; // Number of concurrent requests
     const gatewayPage = await new GatewayReader(new AxiosUrlReader()).fetch();
     const resolutions: ResolutionPage[] = [];
     years = years || gatewayPage.years;
+    const refQueue: DocumentReference[] = []
 
     // Validate that all requested years are available
     const missing = years.filter((year) => gatewayPage.years.indexOf(year) === -1);
     if (missing.length > 0) {
-        throw new Error(`Missing years: ${missing}`);
+        //throw new Error(`Missing years: ${missing}`);
     }
 
     report(`Total ${years.length} years...`);
 
     // Process each year
     for (const year of years) {
-        let currentPage = 1;
-        let numberOfPages = 1;
-        resolutions.splice(0, resolutions.length);
+        let currentPage = 1
+        let numberOfPages = 1
+        resolutions.splice(0, resolutions.length)
         // Process all pages for the current year
         while (currentPage <= numberOfPages) {
             const listPage = await new DocumentListPageReader(currentPage, year, new AxiosUrlReader()).fetch();
@@ -844,12 +876,18 @@ export async function readResolutionsByYears(
             report(`LIST: ${year}: ${currentPage} <${numberOfPages}/${listPage.numberOfRecords}>`);
 
             // Filter out resolutions adopted without a vote
-            const refQueue = listPage.resolutions.filter((ref) => ref.authors !== 'ADOPTED WITHOUT VOTE');
+            listPage.resolutions.filter((ref) => ref.authors !== 'ADOPTED WITHOUT VOTE').map((ref) => refQueue.push(ref))
 
-            // Process resolutions in batches of `concurrent` requests
             while (refQueue.length > 0) {
                 const batchRefs = refQueue.splice(0, concurrent);
-                const batchPromises = batchRefs.map((ref) => processResolution(ref));
+                const batchPromises = batchRefs.map(async (ref) => {
+                    try {
+                        await processResolution(ref)
+                    } catch (ex) {
+                        report(`Error: ${ex}`)
+                        refQueue.push(ref)
+                    }
+                })
                 await Promise.all(batchPromises);
             }
 
@@ -863,24 +901,24 @@ export async function readResolutionsByYears(
     // Function to process a single resolution
     async function processResolution(reference: DocumentReference): Promise<void> {
         try {
-            const votingData = await new VotingDataReader(reference, new CachedAxiosUrlReader()).fetch();
+            const votingData = await new VotingDataReader(reference, new CachedAxiosUrlReader()).fetch()
             const detailsReader = buildReaderInstance(
                 votingData.resolutionCode,
                 votingData.draftResolutionCode,
                 votingData.committeeReportCode,
                 votingData.meetingRecordCode,
                 new CachedAxiosUrlReader()
-            );
+            )
 
             if (!detailsReader) {
                 throw new Error(`Detail reader cannot be built, all options are invalid: ${reference.url}`);
             }
 
             report(`Reading details: ${reference.resolutionCode} [${reference.url}] [${detailsReader.url}]`);
-            const resolutionOrDraft = await detailsReader.fetch();
-            const page = new ResolutionPage(votingData, resolutionOrDraft);
-            report(`Votes: ${page.votes.size}`);
+            const resolutionOrDraft = await detailsReader.fetch()
+            const page = new ResolutionPage(votingData, resolutionOrDraft)
             resolutions.push(page);
+            report(`Votes: ${page.votes.size}`);
         } catch (e) {
             report(`Error: ${reference.url}`);
             throw e;

@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm'
-import { Country, Resolution, Agenda, CountryRepository, AgendaRepository, ResolutionRepository, ReadCursorRepository, Subject, ReadCursor } from './models'
+import { Country, Resolution, Agenda, CountryRepository, AgendaRepository, ResolutionRepository, ReadCursorRepository, Subject, ReadCursor, ResolutionStatus } from './models'
 import { CountryNameTransformer, ResolutionTransformer } from './store'
 import { ResolutionPage } from './crawler'
 import { report } from '../utils'
@@ -123,14 +123,18 @@ export class ImportTask {
         for(const resolution of items) {
             const entity = await this.resolutionTransformer.transform(resolution)
             if((await this.resolutionTransformer.exists(entity))) {
-                taskResult.skipped.push({type: 'resolution', id: entity.symbol})
+                taskResult.skipped.push({type: 'resolution', id: entity.resolutionSymbol})
+                continue
+            }
+            //skip items with undetermined status fields
+            if(entity.resolutionStatus == ResolutionStatus.Unknown) {
                 continue
             }
             const saved = await this.resolutionTransformer.save(entity)
             if(entity.date < earliest || earliest == null) {
                 earliest = entity.date
             }
-            taskResult.successes.push({type: 'resolution', id: saved.symbol})
+            taskResult.successes.push({type: 'resolution', id: saved.resolutionSymbol})
         }
         await this.cursorKeeper.updateDate(earliest)
         return taskResult
