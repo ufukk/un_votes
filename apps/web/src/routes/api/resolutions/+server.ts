@@ -1,4 +1,4 @@
-import { defaultDataSource, YearRange, ResolutionRepository, CountryRepository, AuthorRepository, AgendaRepository, SubjectRepository, ResolutionVoteRepository, ResolutionType, VotingType, ResolutionStatus, Vote, make_slug, SlugAliasRepository } from '../../../../../../packages/shared/src/reader/models';
+import { defaultDataSource, YearRange, ResolutionRepository, CountryRepository, AuthorRepository, AgendaRepository, SubjectRepository, ResolutionVoteRepository, ResolutionType, VotingType, ResolutionStatus, Vote, make_slug, SlugAliasRepository } from '@ufukk/shared/src/reader/models';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 

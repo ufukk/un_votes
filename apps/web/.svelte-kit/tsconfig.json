@@ -3,9 +3,6 @@
 		"paths": {
 			"@ufukk/*": [
 				"../../../packages/*"
-			],
-			"my-directory/*": [
-				"../path/to/my-directory/*"
 			]
 		},
 		"rootDirs": [

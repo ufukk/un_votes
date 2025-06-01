@@ -10,13 +10,10 @@ const config = {
 	kit: {
 		alias: {
 
-			// this will match a directory and its contents
-			// (`my-directory/x` resolves to `path/to/my-directory/x`)
-			'@ufukk/*': '../../packages/*',
 
 			// an alias ending /* will only match
 			// the contents of a directory, not the directory itself
-			'my-directory/*': 'path/to/my-directory/*'
+			'@ufukk/*': '../../packages/*'
 		},
 		// adapter-auto only supports some environments, see https://svelte.dev/docs/kit/adapter-auto for a list.
 		// If your environment is not supported, or you settled on a specific environment, switch out the adapter.
