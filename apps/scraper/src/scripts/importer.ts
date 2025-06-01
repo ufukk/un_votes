@@ -1,9 +1,8 @@
 import "reflect-metadata"
-import { resolve } from 'path'
-import { readResolutionsByYears, AxiosUrlReader, CachedAxiosUrlReader, ResolutionPage, GatewayReader, DocumentReference, VotingDataReader } from '../reader/crawler'
-import { defaultDataSource, ResolutionRepository } from "../reader/models"
-import { DBCursorKeeper, ImportTask, CountryImportTask } from '../reader/tasks'
-import { report } from '../utils'
+import { readResolutionsByYears, AxiosUrlReader, CachedAxiosUrlReader, ResolutionPage, GatewayReader, DocumentReference, VotingDataReader } from '@ufukk/shared/reader/crawler'
+import { defaultDataSource, ResolutionRepository } from "@ufukk/shared/reader/models"
+import { DBCursorKeeper, ImportTask, CountryImportTask } from '@ufukk/shared/reader/tasks'
+import { report } from '@ufukk/shared/utils'
 
 async function importFromWeb(years: number[] | null = null) {
     console.log('IMPORT ...')

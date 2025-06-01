@@ -1,8 +1,8 @@
 import "reflect-metadata"
-import { defaultDataSource, YearRange, ResolutionRepository, CountryRepository, AuthorRepository, AgendaRepository, SubjectRepository, ResolutionVoteRepository, ResolutionType, VotingType, ResolutionStatus, Vote, make_slug, SlugAliasRepository } from '../reader/models';
-import { getResolutionVotes, findTopVotingPartners, findMatchingVotingCountries, findMostActiveCountries, fetchVotingData, clusterCountriesByVoting } from '../analysis/resolutions';
-import { findFrequentVotingGroups, findFrequentVotingGroupsHier, findFrequentVotingGroupsFlat, findCountryGroup } from '../analysis/groups'
-import { extractKeywords, extractNouns, extractKeywords2 } from '../analysis/keywords'
+import { defaultDataSource, YearRange, ResolutionRepository, CountryRepository, AuthorRepository, AgendaRepository, SubjectRepository, ResolutionVoteRepository, ResolutionType, VotingType, ResolutionStatus, Vote, make_slug, SlugAliasRepository } from '@ufukk/shared/reader/models';
+import { getResolutionVotes, findTopVotingPartners, findMatchingVotingCountries, findMostActiveCountries, fetchVotingData, clusterCountriesByVoting } from '@ufukk/shared/analysis/resolutions';
+import { findFrequentVotingGroups, findFrequentVotingGroupsHier, findFrequentVotingGroupsFlat, findCountryGroup } from '@ufukk/shared/analysis/groups'
+import { extractKeywords, extractNouns, extractKeywords2 } from '@ufukk/shared/analysis/keywords'
 import { Like } from 'typeorm';
 
 // Initialize the database connection
@@ -14,7 +14,7 @@ async function initializeDB() {
 }
 
 // Query resolutions by year
-async function queryResolutionsByYear(year: number, votingType: 'general' | 'security' | null=null) {
+async function queryResolutionsByYear(year: number, votingType: 'general' | 'security' | null = null) {
     const type = votingType == 'security' ? VotingType.SecurityCouncil : (votingType == 'general' ? VotingType.GeneralCouncil : null)
     const resolutionRepo = ResolutionRepository.createInstance(defaultDataSource);
     const count = await resolutionRepo.resolutionCountByYear(year, type)
@@ -77,15 +77,15 @@ async function queryAuthorByName(authorName: string) {
 // Query subjects by name
 async function querySubjects() {
     const subjectRepo = SubjectRepository.createInstance(defaultDataSource);
-    const subjects = await subjectRepo.find({order: {subjectName: 'ASC'}});
-    console.table(subjects.map(sbj => ({Name: sbj.subjectName})));
+    const subjects = await subjectRepo.find({ order: { subjectName: 'ASC' } });
+    console.table(subjects.map(sbj => ({ Name: sbj.subjectName })));
 }
 
 // Query subjects by name
 async function queryAgendas(query: string) {
     const repo = AgendaRepository.createInstance(defaultDataSource);
-    const names = (await repo.find({where: {name: Like(`%${query}%`)}, order: {name: 'ASC'} })).map((agenda) => agenda.un_name)
-    for(const keyword of names) {
+    const names = (await repo.find({ where: { name: Like(`%${query}%`) }, order: { name: 'ASC' } })).map((agenda) => agenda.un_name)
+    for (const keyword of names) {
         console.log(extractKeywords2(keyword));
     }
 }
@@ -132,28 +132,28 @@ async function votingClusters() {
     const groups = await findFrequentVotingGroupsFlat(new YearRange(2023, 2024))
     const country = 'turkey'
     const group = findCountryGroup(country, groups)
-    if(group) {
+    if (group) {
         console.log(`GROUP: ${group.group}`)
     } else {
         console.log(`NOT FOUND: ${country}`)
     }
     //const range = new YearRange(2023, 2025);
     //const clusters = await clusterCountriesByVoting(range)
-    console.table(groups.map(grp => ({ Countries: grp.group.join(', '), Compability: grp.averageCompatibility})))
+    console.table(groups.map(grp => ({ Countries: grp.group.join(', '), Compability: grp.averageCompatibility })))
 }
 
 async function addAlias(slug: string, alias: string) {
-    if(!slug || !alias) {
+    if (!slug || !alias) {
         console.log('a slug and an alias is required');
         return;
     }
     const repo = SlugAliasRepository.createInstance(defaultDataSource);
-    const doesExist = await repo.existsBy({alias: alias})
-    if(doesExist) {
+    const doesExist = await repo.existsBy({ alias: alias })
+    if (doesExist) {
         console.log(`Alias ${alias} already exists`);
         return
     }
-    const slugAlias = repo.create({slug: slug, alias: alias});
+    const slugAlias = repo.create({ slug: slug, alias: alias });
     await repo.save(slugAlias)
     console.log(`Alias for ${slug} created`);
 }

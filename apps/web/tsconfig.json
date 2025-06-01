@@ -1,0 +1,11 @@
+{
+    "compilerOptions": {
+        "paths": {
+            "@ufukk/shared/*": [
+                "../../packages/shared/src/*"
+            ]
+        },
+        "emitDecoratorMetadata": true,
+        "experimentalDecorators": true
+    }
+}

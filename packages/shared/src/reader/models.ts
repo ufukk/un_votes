@@ -1,5 +1,4 @@
-import "reflect-metadata"
-import { Entity, PrimaryGeneratedColumn, Column, JoinTable, OneToMany, DataSource, Repository, Unique, ManyToOne, ManyToMany, In, OneToOne, JoinColumn, PrimaryColumn } from "typeorm"
+import { Entity, PrimaryGeneratedColumn, Column, JoinTable, OneToMany, DataSource, Repository, Unique, ManyToOne, ManyToMany, In, OneToOne, JoinColumn } from "typeorm"
 
 export enum ResolutionType {
     Resolution,
@@ -27,7 +26,7 @@ export enum Vote {
 }
 
 export class YearRange {
-    
+
     constructor(public readonly start: number, public readonly finish: number) {
 
     }
@@ -37,13 +36,13 @@ export class YearRange {
 @Entity()
 export class ReadCursor {
 
-    @Column({primary: true, length: 50, type: 'varchar'})
+    @Column({ primary: true, length: 50, type: 'varchar' })
     cursorId: string
 
-    @Column({nullable: true, type: 'date'})
+    @Column({ nullable: true, type: 'date' })
     lastDate: Date
 
-    @Column({nullable: true, type: 'integer'})
+    @Column({ nullable: true, type: 'integer' })
     year: number
 }
 
@@ -54,35 +53,35 @@ export class SlugAlias {
     @PrimaryGeneratedColumn()
     slugId: number
 
-    @Column({length: 50, type: 'varchar'})
+    @Column({ length: 50, type: 'varchar' })
     slug: string
 
-    @Column({length: 50, type: 'varchar'})
+    @Column({ length: 50, type: 'varchar' })
     alias: string
 }
 
 @Entity()
 export class Country {
-    
+
     @PrimaryGeneratedColumn()
     countryId: number
 
-    @Column({unique: true, type: 'varchar'})
+    @Column({ unique: true, type: 'varchar' })
     name: string
-    
-    @Column({unique: true, type: 'varchar'})
+
+    @Column({ unique: true, type: 'varchar' })
     un_name: string
-    
-    @Column({unique: true, type: 'varchar'})
+
+    @Column({ unique: true, type: 'varchar' })
     slug: string
 
-    @Column({unique: true, nullable: true, type: 'varchar'})
+    @Column({ unique: true, nullable: true, type: 'varchar' })
     alpha2: string
-    
-    @Column({unique: true, nullable: true, type: 'varchar'})
+
+    @Column({ unique: true, nullable: true, type: 'varchar' })
     iso3: string
 
-    @Column({unique: true, nullable: true, type: 'integer'})
+    @Column({ unique: true, nullable: true, type: 'integer' })
     fipscode: number
 }
 
@@ -92,10 +91,10 @@ export class Author {
     @PrimaryGeneratedColumn()
     authorId: number
 
-    @Column({unique: true, type: 'varchar'})
+    @Column({ unique: true, type: 'varchar' })
     authorName: string
 
-    @OneToOne(() => Country, {eager: true, nullable: true})
+    @OneToOne(() => Country, { eager: true, nullable: true })
     @JoinColumn()
     country: Country | null
 }
@@ -106,10 +105,10 @@ export class Agenda {
     @PrimaryGeneratedColumn()
     agendaId: number
 
-    @Column({unique: true, type: 'varchar'})
+    @Column({ unique: true, type: 'varchar' })
     name: string
 
-    @Column({unique: true, type: 'varchar'})
+    @Column({ unique: true, type: 'varchar' })
     un_name: string
 }
 
@@ -119,7 +118,7 @@ export class Subject {
     @PrimaryGeneratedColumn()
     subjectId: number
 
-    @Column({unique: true, type: 'varchar'})
+    @Column({ unique: true, type: 'varchar' })
     subjectName: string
 }
 
@@ -127,73 +126,73 @@ export class Subject {
 @Entity()
 export class Resolution {
 
-    @PrimaryGeneratedColumn({type: 'integer'})
+    @PrimaryGeneratedColumn({ type: 'integer' })
     resolutionId: number
 
-    @Column({type: "varchar", unique: true})
+    @Column({ type: "varchar", unique: true })
     resolutionSymbol: string
 
-    @Column({type: "varchar"})
+    @Column({ type: "varchar" })
     title: string
 
-    @Column({enum: VotingType, type: 'varchar'})
+    @Column({ enum: VotingType, type: 'varchar' })
     votingType: VotingType
 
-    @Column({enum: ResolutionStatus, type: 'varchar'})
+    @Column({ enum: ResolutionStatus, type: 'varchar' })
     resolutionStatus: ResolutionStatus
 
-    @Column({nullable: true, type: 'varchar'})
+    @Column({ nullable: true, type: 'varchar' })
     alternativeTitles: string
-    
-    @OneToOne(() => Resolution, {nullable: true})
+
+    @OneToOne(() => Resolution, { nullable: true })
     meetingRecord: Resolution
-    
-    @OneToOne(() => Resolution, {nullable: true})
+
+    @OneToOne(() => Resolution, { nullable: true })
     draftResolution: string
-    
-    @OneToOne(() => Resolution, {nullable: true})
+
+    @OneToOne(() => Resolution, { nullable: true })
     committeeReport: string
-    
-    @Column({nullable: true, type: 'varchar'})
+
+    @Column({ nullable: true, type: 'varchar' })
     voteSummary: string
 
-    @Column({nullable: true, type: 'varchar'})
+    @Column({ nullable: true, type: 'varchar' })
     resolutionOrDecision: string
-        
-    @Column({nullable: true, type: 'varchar'})
+
+    @Column({ nullable: true, type: 'varchar' })
     agendaInformation: string
-    
-    @Column({type: 'date'})
+
+    @Column({ type: 'date' })
     date: Date
 
-    @Column({type: 'smallint'})
+    @Column({ type: 'smallint' })
     year: number
 
-    @Column({type: 'varchar'})
+    @Column({ type: 'varchar' })
     detailsUrl: string
 
-    @Column({nullable: true, type: 'varchar'})
+    @Column({ nullable: true, type: 'varchar' })
     description: string
 
-    @Column({nullable: true, type: 'varchar'})
+    @Column({ nullable: true, type: 'varchar' })
     notes: string
-    
-    @OneToMany(() => DocumentUrl, (text) => text.resolution, {eager: true, cascade: true})
+
+    @OneToMany(() => DocumentUrl, (text) => text.resolution, { eager: true, cascade: true })
     @JoinTable()
     documentUrls: DocumentUrl[]
 
-    @ManyToMany(() => Subject, {eager: true})
+    @ManyToMany(() => Subject, { eager: true })
     @JoinTable()
     subjects: Subject[]
 
-    @ManyToMany(() => Author, {eager: true})
+    @ManyToMany(() => Author, { eager: true })
     @JoinTable()
     authors: Author[]
 
-    @OneToMany(() => ResolutionVote, (vote) => vote.resolution, {eager: true, cascade: true})
+    @OneToMany(() => ResolutionVote, (vote) => vote.resolution, { eager: true, cascade: true })
     votes: ResolutionVote[]
 
-    @ManyToMany(() => Agenda, {eager: true})
+    @ManyToMany(() => Agenda, { eager: true })
     @JoinTable()
     agendas: Agenda[]
 }
@@ -201,13 +200,13 @@ export class Resolution {
 @Entity()
 export class DocumentUrl {
 
-    @PrimaryGeneratedColumn({type: 'integer'})
+    @PrimaryGeneratedColumn({ type: 'integer' })
     documentId: number
 
-    @Column({type: 'varchar'})
+    @Column({ type: 'varchar' })
     language: string
 
-    @Column({type: 'varchar'})
+    @Column({ type: 'varchar' })
     url: string
 
     @ManyToOne(() => Resolution, (resolution) => resolution.documentUrls)
@@ -219,16 +218,16 @@ export class DocumentUrl {
 @Unique(['resolution', 'country'])
 export class ResolutionVote {
 
-    @PrimaryGeneratedColumn({type: 'integer'})
+    @PrimaryGeneratedColumn({ type: 'integer' })
     voteId: number
 
     @ManyToOne(() => Resolution, (resolution) => resolution.votes)
     resolution: Resolution
 
-    @ManyToOne((type) => Country, {eager: true})
+    @ManyToOne((type) => Country, { eager: true })
     country: Country
 
-    @Column({enum: Vote, type: 'integer'})
+    @Column({ enum: Vote, type: 'integer' })
     vote: Vote
 }
 
@@ -242,7 +241,7 @@ export const defaultDataSource = new DataSource({
 let dataConnection: DataSource | null = null
 
 export async function getDefaultConnection(): Promise<DataSource> {
-    if(!dataConnection) {
+    if (!dataConnection) {
         dataConnection = await defaultDataSource.initialize()
     }
     return dataConnection
@@ -250,80 +249,80 @@ export async function getDefaultConnection(): Promise<DataSource> {
 
 class BaseRepository<T> extends Repository<T> {
 
-    
+
 
 }
 
 export class ResolutionRepository extends BaseRepository<Resolution> {
-    
+
     static createInstance(dataSource: DataSource): ResolutionRepository {
         return new ResolutionRepository(Resolution, dataSource.createEntityManager())
     }
 
     voteMap(resolution: Resolution): Map<string, Vote> {
         let vote_map = new Map<string, Vote>()
-        for(let vote of resolution.votes) {
+        for (let vote of resolution.votes) {
             vote_map.set(vote.country.name, vote.vote)
         }
         return vote_map
     }
 
-    async resolutionsByYear(year: number, limit: number, offset: number, votingType: VotingType | null=null): Promise<Resolution[]> {
+    async resolutionsByYear(year: number, limit: number, offset: number, votingType: VotingType | null = null): Promise<Resolution[]> {
         const startDate = new Date(year, 0, 1);
         const endDate = new Date(year + 1, 0, 1);
         let q = this.createQueryBuilder('resolution')
-          .where('year = :year', { year })
-          .orderBy('date', 'ASC')
-          .skip(offset)
-          .take(limit)
-        if(votingType) {
-            q = q.andWhere('votingType = :votingType', {votingType})
+            .where('year = :year', { year })
+            .orderBy('date', 'ASC')
+            .skip(offset)
+            .take(limit)
+        if (votingType) {
+            q = q.andWhere('votingType = :votingType', { votingType })
         }
         return q.getMany()
     }
-      
-    async resolutionCountByYear(year: number, votingType: VotingType | null=null): Promise<number> {
+
+    async resolutionCountByYear(year: number, votingType: VotingType | null = null): Promise<number> {
         let q = this.createQueryBuilder('resolution')
-          .where('year >= :year AND year <= :year', { year })
-        if(votingType) {
-            q = q.andWhere('votingType = :votingType', {votingType})
+            .where('year >= :year AND year <= :year', { year })
+        if (votingType) {
+            q = q.andWhere('votingType = :votingType', { votingType })
         }
-        return  q.getCount();
+        return q.getCount();
     }
 
     async resolutionsByAgenda(agenda: number, limit: number, offset: number): Promise<Resolution[]> {
         return this.createQueryBuilder('resolution')
-          .leftJoinAndSelect('resolution.agendas', 'agenda')
-          .where('agenda.agenda_id = :agenda', { agenda })
-          .orderBy('date', 'ASC')
-          .skip(offset)
-          .take(limit)
-          .getMany();
+            .leftJoinAndSelect('resolution.agendas', 'agenda')
+            .where('agenda.agenda_id = :agenda', { agenda })
+            .orderBy('date', 'ASC')
+            .skip(offset)
+            .take(limit)
+            .getMany();
     }
-    
+
     async doesResolutionCodeExist(symbol: string): Promise<boolean> {
-        return (await this.countBy({resolutionSymbol: symbol})) > 0
+        return (await this.countBy({ resolutionSymbol: symbol })) > 0
     }
 
     async latestYear(): Promise<number> {
         return new Date((await this.createQueryBuilder('resolution')
-        .select('MAX(date)', 'max_date')
-        .getRawOne()).max_date).getFullYear()
+            .select('MAX(date)', 'max_date')
+            .getRawOne()).max_date).getFullYear()
     }
 
     async earliestYear(): Promise<number> {
         return new Date((await this.createQueryBuilder('resolution')
-        .select('MIN(date)', 'min_date')
-        .getRawOne()).min_date).getFullYear()
+            .select('MIN(date)', 'min_date')
+            .getRawOne()).min_date).getFullYear()
     }
 
-    async getYearResolutionNumbers(): Promise<{year: number, total: number}[]> {
+    async getYearResolutionNumbers(): Promise<{ year: number, total: number }[]> {
         return this.createQueryBuilder('resolution')
-          .select('CAST(strftime("%Y", date) as \'integer\')', 'year')
-          .addSelect('COUNT(*)', 'total')
-          .groupBy('year')
-          .orderBy('year', 'ASC')
-          .getRawMany();
+            .select('CAST(strftime("%Y", date) as \'integer\')', 'year')
+            .addSelect('COUNT(*)', 'total')
+            .groupBy('year')
+            .orderBy('year', 'ASC')
+            .getRawMany();
     }
 }
 
@@ -343,7 +342,7 @@ export class CountryRepository extends BaseRepository<Country> {
 
     async fetchBySlugs(slugs: string[]): Promise<Country | null> {
         return await this.findOne({
-            where: {slug: In(slugs)}
+            where: { slug: In(slugs) }
         })
     }
 
@@ -364,7 +363,7 @@ export class AgendaRepository extends BaseRepository<Agenda> {
     }
 
     async fetchByUnName(name: string): Promise<Agenda> {
-        return await this.findOneBy({un_name: name})
+        return await this.findOneBy({ un_name: name })
     }
 
 }
@@ -376,7 +375,7 @@ export class SubjectRepository extends BaseRepository<Subject> {
     }
 
     async fetchByName(name: string): Promise<Subject> {
-        return await this.findOneBy({subjectName: name})
+        return await this.findOneBy({ subjectName: name })
     }
 
 }
@@ -388,11 +387,11 @@ export class SlugAliasRepository extends BaseRepository<SlugAlias> {
 }
 
 export class ReadCursorRepository extends BaseRepository<ReadCursor> {
-   static createInstance(dataSource: DataSource): ReadCursorRepository {
+    static createInstance(dataSource: DataSource): ReadCursorRepository {
         return new ReadCursorRepository(ReadCursor, dataSource.createEntityManager())
     }
 }
 
 export function make_slug(str: string): string {
-    return str.trim().normalize('NFKD').toLowerCase().replace(' ','-').replace(/[^\w\-]/g, '')
+    return str.trim().normalize('NFKD').toLowerCase().replace(' ', '-').replace(/[^\w\-]/g, '')
 }

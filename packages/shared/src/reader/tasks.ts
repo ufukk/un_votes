@@ -12,16 +12,16 @@ export interface CursorKeeper {
 
     updateYear(year: number): Promise<void>
 
-    get(): Promise<{date: Date, year: number}>
+    get(): Promise<{ date: Date, year: number }>
 
 }
 
-type TaskItem = {type: 'draft' | 'resolution', id: string | number}
+type TaskItem = { type: 'draft' | 'resolution', id: string | number }
 
 interface TaskResult {
     get successes(): TaskItem[]
     get skipped(): TaskItem[]
-    get errors(): TaskItem[] 
+    get errors(): TaskItem[]
     fold(batch: TaskResult): void
 }
 
@@ -35,8 +35,8 @@ export class DBCursorKeeper implements CursorKeeper {
     }
 
     private async _getCursor(): Promise<ReadCursor> {
-        let cursor = await this.cursorRepo.findOneBy({cursorId: this.cursorId})
-        if(cursor == null) {
+        let cursor = await this.cursorRepo.findOneBy({ cursorId: this.cursorId })
+        if (cursor == null) {
             cursor = new ReadCursor()
             cursor.cursorId = this.cursorId
         }
@@ -45,7 +45,7 @@ export class DBCursorKeeper implements CursorKeeper {
 
     async updateDate(lastDate: Date): Promise<void> {
         const cursor = await this._getCursor()
-        if(lastDate < cursor.lastDate || !cursor.lastDate) {
+        if (lastDate < cursor.lastDate || !cursor.lastDate) {
             cursor.lastDate = lastDate
             await this.cursorRepo.save(cursor)
         }
@@ -53,7 +53,7 @@ export class DBCursorKeeper implements CursorKeeper {
 
     async updateYear(year: number): Promise<void> {
         const cursor = await this._getCursor()
-        if(year < cursor.year || !cursor.year) {
+        if (year < cursor.year || !cursor.year) {
             cursor.year = year
             await this.cursorRepo.save(cursor)
         }
@@ -61,9 +61,9 @@ export class DBCursorKeeper implements CursorKeeper {
 
     async get(): Promise<{ date: Date; year: number }> {
         const cursor = await this._getCursor()
-        return {date: cursor.lastDate, year: cursor.year}
+        return { date: cursor.lastDate, year: cursor.year }
     }
-    
+
 }
 
 class BatchTaskResult implements TaskResult {
@@ -88,12 +88,12 @@ class BatchTaskResult implements TaskResult {
 
     get errors(): TaskItem[] {
         return this._errors
-    } 
+    }
 
     public fold(batch: TaskResult): void {
-        this._successes.push(... batch.successes)
-        this._skipped.push(... batch.skipped)
-        this._errors.push(... batch.errors)
+        this._successes.push(...batch.successes)
+        this._skipped.push(...batch.skipped)
+        this._errors.push(...batch.errors)
     }
 
 }
@@ -104,15 +104,15 @@ export class TaskResultWrapper extends BatchTaskResult {
     }
 }
 
-type ImportableCollection = {resolutions: ResolutionPage[]}
+type ImportableCollection = { resolutions: ResolutionPage[] }
 
 export class ImportTask {
 
     readonly taskResult: TaskResultWrapper
     readonly resolutionTransformer: ResolutionTransformer
 
-    constructor(public readonly dataSource: DataSource, 
-                public readonly cursorKeeper: CursorKeeper) {
+    constructor(public readonly dataSource: DataSource,
+        public readonly cursorKeeper: CursorKeeper) {
         this.taskResult = new TaskResultWrapper()
         this.resolutionTransformer = new ResolutionTransformer(this.dataSource)
     }
@@ -120,21 +120,21 @@ export class ImportTask {
     protected async _importResolutions(items: ResolutionPage[]): Promise<TaskResult> {
         const taskResult = new BatchTaskResult()
         let earliest: Date = null
-        for(const resolution of items) {
+        for (const resolution of items) {
             const entity = await this.resolutionTransformer.transform(resolution)
-            if((await this.resolutionTransformer.exists(entity))) {
-                taskResult.skipped.push({type: 'resolution', id: entity.resolutionSymbol})
+            if ((await this.resolutionTransformer.exists(entity))) {
+                taskResult.skipped.push({ type: 'resolution', id: entity.resolutionSymbol })
                 continue
             }
             //skip items with undetermined status fields
-            if(entity.resolutionStatus == ResolutionStatus.Unknown) {
+            if (entity.resolutionStatus == ResolutionStatus.Unknown) {
                 continue
             }
             const saved = await this.resolutionTransformer.save(entity)
-            if(entity.date < earliest || earliest == null) {
+            if (entity.date < earliest || earliest == null) {
                 earliest = entity.date
             }
-            taskResult.successes.push({type: 'resolution', id: saved.resolutionSymbol})
+            taskResult.successes.push({ type: 'resolution', id: saved.resolutionSymbol })
         }
         await this.cursorKeeper.updateDate(earliest)
         return taskResult
@@ -150,12 +150,12 @@ export class ImportTask {
 
 export class CountryImportTask {
 
-    constructor(public readonly dataSource: DataSource) {}
+    constructor(public readonly dataSource: DataSource) { }
 
     async importCountries(filePath: string): Promise<number> {
         const transformer = new CountryNameTransformer(this.dataSource)
         const parser = fs.createReadStream(filePath)
-        .pipe(parse({comment: '#', delimiter: '\t', relaxColumnCount: true}))
+            .pipe(parse({ comment: '#', delimiter: '\t', relaxColumnCount: true }))
         let total = 0
         for await (const row of parser) {
             const country = await transformer.transform(row[4])
@@ -163,7 +163,7 @@ export class CountryImportTask {
             country.fipscode = row[2]
             country.iso3 = row[1].trim()
             const doesExist = await transformer.exists(country)
-            if(!doesExist) {
+            if (!doesExist) {
                 transformer.save(country)
             }
             report([country.name, country.un_name, country.alpha2, country.fipscode], 'ROW')
