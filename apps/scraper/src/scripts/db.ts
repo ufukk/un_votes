@@ -1,5 +1,5 @@
 import "reflect-metadata"
-import { defaultDataSource, YearRange, ResolutionRepository, CountryRepository, AuthorRepository, AgendaRepository, SubjectRepository, ResolutionVoteRepository, ResolutionType, VotingType, ResolutionStatus, Vote, make_slug, SlugAliasRepository } from '@ufukk/shared/reader/models';
+import { defaultDataSource, getDefaultConnection, YearRange, ResolutionRepository, CountryRepository, AuthorRepository, AgendaRepository, SubjectRepository, ResolutionVoteRepository, ResolutionType, VotingType, ResolutionStatus, Vote, make_slug, SlugAliasRepository } from '@ufukk/shared/reader/models';
 import { getResolutionVotes, findTopVotingPartners, findMatchingVotingCountries, findMostActiveCountries, fetchVotingData, clusterCountriesByVoting } from '@ufukk/shared/analysis/resolutions';
 import { findFrequentVotingGroups, findFrequentVotingGroupsHier, findFrequentVotingGroupsFlat, findCountryGroup } from '@ufukk/shared/analysis/groups'
 import { extractKeywords, extractNouns, extractKeywords2 } from '@ufukk/shared/analysis/keywords'
@@ -19,6 +19,7 @@ async function queryResolutionsByYear(year: number, votingType: 'general' | 'sec
     const resolutionRepo = ResolutionRepository.createInstance(defaultDataSource);
     const count = await resolutionRepo.resolutionCountByYear(year, type)
     const resolutions = await resolutionRepo.resolutionsByYear(year, 50, 0, type);
+    const voteRepo = ResolutionVoteRepository.createInstance(defaultDataSource);
     console.log(`Resolutions for year ${year} [Total: ${count}]:`);
     console.table(resolutions.map(res => ({
         Symbol: res.resolutionSymbol,

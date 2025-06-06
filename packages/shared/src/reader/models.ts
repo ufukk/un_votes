@@ -125,7 +125,6 @@ export class Subject {
 
 @Entity()
 export class Resolution {
-
     @PrimaryGeneratedColumn({ type: 'integer' })
     resolutionId: number
 
@@ -241,7 +240,7 @@ export const defaultDataSource = new DataSource({
 let dataConnection: DataSource | null = null
 
 export async function getDefaultConnection(): Promise<DataSource> {
-    if (!dataConnection) {
+    if (!dataConnection || !dataConnection.isInitialized) {
         dataConnection = await defaultDataSource.initialize()
     }
     return dataConnection
@@ -300,6 +299,22 @@ export class ResolutionRepository extends BaseRepository<Resolution> {
             .getMany();
     }
 
+    async pagedQuery(options: { subjectIds?: number[], year?: number, start: number, size: number }): Promise<{ total: number, resolutions: Resolution[] }> {
+        let x: Resolution & { voteCount: number }
+        let q = this.createQueryBuilder('resolution').leftJoin('resolution.subjects', 'subject').where('1 == 1')
+        if (options.subjectIds) {
+            q = q.andWhere('subject.subjectId IN(:subjectIds)', { subjectIds: options.subjectIds!.join(',') })
+        }
+        if (options.year) {
+            q = q.andWhere('year = :year', { year: options.year! })
+        }
+        q = q.orderBy('resolution_date', 'DESC')
+        const total = await q.getCount()
+        const resolutions = await q.skip(options.start).take(options.size).getMany()
+        return { total, resolutions }
+    }
+
+
     async doesResolutionCodeExist(symbol: string): Promise<boolean> {
         return (await this.countBy({ resolutionSymbol: symbol })) > 0
     }
@@ -324,12 +339,37 @@ export class ResolutionRepository extends BaseRepository<Resolution> {
             .orderBy('year', 'ASC')
             .getRawMany();
     }
+
+    async getResolutionNumbersByVotingType(votingType: VotingType): Promise<number> {
+        return (await this.createQueryBuilder('resolution')
+            .addSelect('COUNT(*)', 'total')
+            .where("votingType = :votingType", { votingType: votingType })
+            .getRawOne())['total']
+    }
+
+    async getAvailableYears(): Promise<number[]> {
+        const result = await this.createQueryBuilder('resolution')
+            .select('DISTINCT(year)', 'year')
+            .orderBy('year', 'DESC')
+            .getRawMany();
+        return result.map(r => r.year);
+    }
 }
 
 export class ResolutionVoteRepository extends BaseRepository<ResolutionVote> {
 
     static createInstance(dataSource: DataSource): ResolutionVoteRepository {
         return new ResolutionVoteRepository(ResolutionVote, dataSource.createEntityManager())
+    }
+
+    async voteCountsForResolution(resolutionId: number, vote?: Vote): Promise<number> {
+        let q = this.createQueryBuilder("resolution_vote")
+            .addSelect('COUNT(voteId) as total')
+            .where("resolutionResolutionId = :resolutionId", { resolutionId })
+        if (vote) {
+            q = q.andWhere('vote = :vote', { vote })
+        }
+        return q.getRawOne()['total']
     }
 
 }

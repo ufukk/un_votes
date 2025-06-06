@@ -1,7 +1,15 @@
 {
 	"/": [],
+	"/api/find_subjects": [
+		"src/routes/api/find_subjects/+server.ts"
+	],
 	"/api/resolutions": [
 		"src/routes/api/resolutions/+server.ts"
 	],
-	"/resolutions": []
+	"/countries": [],
+	"/countries/[id]": [],
+	"/resolutions": [
+		"src/routes/resolutions/+page.server.ts"
+	],
+	"/resolutions/[id]": []
 }

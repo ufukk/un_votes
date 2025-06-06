@@ -1,3 +1,16 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
+
+/* Custom styles */
+.container {
+    max-width: 1200px;
+}
+
+tr:nth-child(even) {
+    @apply bg-gray-50;
+}
+
+a {
+    @apply text-blue-600 hover:text-blue-800;
+}
